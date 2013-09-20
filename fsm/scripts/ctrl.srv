@@ -1,0 +1,6 @@
+#Request Fields
+boolean status_in
+Float16 reference
+---
+#Respond Fields
+boolean status_out
