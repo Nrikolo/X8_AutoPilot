@@ -1,0 +1,18 @@
+<package>
+  <description brief="beginner_tutorials">
+
+     beginner_tutorials
+
+  </description>
+  <author>Riko</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/beginner_tutorials</url>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="rospy"/>
+  <depend package="roscpp"/>
+
+</package>
+
+

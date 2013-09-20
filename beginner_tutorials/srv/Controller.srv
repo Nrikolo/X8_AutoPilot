@@ -1,0 +1,15 @@
+#A boolean to [0,1]= [Turn OFF,Turn ON] 
+bool ON_OFF
+
+#An arary of time stamped 3D points representing a trajectory the controller should track
+geometry_msgs/PoseStamped[] trajectory
+
+#A boolean to [0,1]= [use default gains, use input gains] 
+bool input_gain_flag
+
+#An array holding PID gain values   {float = P,float = I,float = D}
+float32[] gains 
+#http://answers.ros.org/question/9471/how-to-recieve-an-array-over-publisher-and-subscriber-python/
+------
+#A boolean [0,1] = [success, failure] of turning the controller on
+bool success
