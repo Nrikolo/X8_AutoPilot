@@ -45,7 +45,7 @@ class ListenerClass():
                                                           self.MissionGo_callback)                                                             
         #Initialize the data loggers for the listener 
         self.batteryVoltage   = 15
-        self.poseStampedQueue = [] #Pose(Point(0.0, 0.0, 0.000), Quaternion(0.000, 0.000, 0.0, 1.0))
+        self.poseStampedQueue = [] 
         self.ctrlThrottle     = 0
         self.AutoPilotSwitch  = True
         self.MissionGoSwitch  = True
@@ -53,7 +53,7 @@ class ListenerClass():
 
     def battery_callback(self,data):
         #rospy.loginfo(rospy.get_caller_id() + " I heard  %s  ",  data.data)
-        self.battery_voltage  = data.data
+        self.batteryVoltage  = data.data
         
     def poseStamped_callback(self,data):
         #rospy.loginfo(rospy.get_caller_id() + " I heard  %s  ",  data)

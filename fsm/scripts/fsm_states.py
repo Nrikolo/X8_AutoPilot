@@ -31,8 +31,8 @@ class MANUAL(smach.State):
         rospy.sleep(self.flightStatus.sleepTime)
         while True:
             #rospy.loginfo(" I heard  %s  ",  self.flightStatus.homeCoordinates)
-            if self.flightStatus.listener.AutoPilotSwitch == True  and self.flightStatus.listener.MissionGoSwitch == True:
-                print ("Both Switches are ON - Autopilot turned on, PC has control!")                 
+            if self.flightStatus.IsBatteryOK() and self.flightStatus.listener.AutoPilotSwitch == True :
+                print ("AutoPilot switch is ON, there is enough battery ---->>> Transfering control to PC ")                 
                 return 'TOAUTONOMOUS'
                 
             if self.flightStatus.IsTimeExceeded() : 
@@ -51,7 +51,8 @@ class AUTONOMOUS_INIT(smach.State):
      def execute(self, userdata):
         rospy.loginfo('Executing state AUTONOMOUS_INIT')
         rospy.sleep(self.flightStatus.sleepTime)
-        if self.flightStatus.listener.AutoPilotSwitch == True : # and self.flightStatus.ctrlThrottle< userdata.AutoInit_throttleThreshold:
+        if self.flightStatus.IsBatteryOK() and self.flightStatus.listener.AutoPilotSwitch == True : 
+            #??? and self.flightStatus.ctrlThrottle< userdata.AutoInit_throttleThreshold:
             z = self.flightStatus.getAltitude()
             if z > self.flightStatus.safeAltitude: #Safe
                 print ("Vehicle above minimal safe altitude - goto HOVER")                 
@@ -70,16 +71,15 @@ class AUTONOMOUS_INIT(smach.State):
 class TAKEOFF(smach.State):
      def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Success',
-                                            'Maintain',
-                                            'Aborted_NoBatt',
-                                            'Aborted_Diverge'],
+                                             'Aborted_NoBatt',
+                                            'Aborted_Diverge',
+                                            'Maintain'],
                                    input_keys=['takeoff_Home'])
         self.flightStatus = flightStatus
 
      def execute(self, userdata):
         rospy.loginfo('Executing state TAKEOFF')
         rospy.sleep(self.flightStatus.sleepTime)        
-               
         if self.flightStatus.listener.AutoPilotSwitch == False or  self.flightStatus.AnyErrorDiverge()==True:
             print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
             return 'Aborted_Diverge'
@@ -89,17 +89,19 @@ class TAKEOFF(smach.State):
         if self.flightStatus.ErrorConverge(2)==True: 
             print ("Takeoff complete and succeful - goto HOVER")
             return 'Success'
-        print ("TakingOff...")#Later should be mapped to GOHOME state
+        print ("TakingOff...")#Later should be mapped to GOHOME state        
         return 'Maintain'
+
+            
 
 
 # define state HOVER
 class HOVER(smach.State):
      def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['MissionDone',
-                                            'Maintain',
                                             'Aborted_NoBatt',
-                                            'Aborted_Diverge'],
+                                            'Aborted_Diverge',
+                                            'Maintain'],
                                    input_keys=['hover_Home'])
         self.flightStatus = flightStatus
 
@@ -107,27 +109,25 @@ class HOVER(smach.State):
         rospy.loginfo('Executing state HOVER')
         rospy.sleep(self.flightStatus.sleepTime)
         z_ref = self.flightStatus.getAltitude() #use present altitude as ref
-      
         if self.flightStatus.AnyErrorDiverge():
             print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
             return 'Aborted_Diverge' #->Manual!
-        if not self.flightStatus.IsBatteryOK():
+        if not self.flightStatus.IsBatteryOK() or self.flightStatus.listener.MissionGoSwitch == False:
             print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
             return 'Aborted_NoBatt' #->Vehicle should LAND
         if self.flightStatus.IsTimeExceeded() : #Mission Duration Reached
             print ("Mission Duration Exceeded - Finish") 
             return 'MissionDone'
-        else : #Maintain hover
-            print("Hovering....")
-            return 'Maintain'
-   
-    
+        print("Hovering....")
+        return 'Maintain'
+            
+                
 # define state LAND
 class LAND(smach.State):
      def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Success',
-                                            'Maintain',
-                                            'Failure'],
+                                            'Failure',
+                                            'Maintain'],
                                    input_keys=['land_Home'])
         self.flightStatus = flightStatus
      
@@ -137,13 +137,12 @@ class LAND(smach.State):
         if self.flightStatus.AnyErrorDiverge():
             print ("Vehicle is unstable - goto MANUAL")                 
             return 'Failure' #->Manual!
-        if self.flightStatus.ErrorConverge(2,self.flightStatus.groundLevel):    
-           print ("Vehicle has landed - goto IDLE")                 
-           return 'Success' #->Idle
-        
+        if self.flightStatus.ErrorConverge(2):    
+            print ("Vehicle has landed - goto IDLE")                 
+            return 'Success' #->Idle
         print ("Landing...")                  
         return 'Maintain' #Remain in Land!
- 
+     
                
 # define state IDLE
 class IDLE(smach.State):
@@ -153,21 +152,51 @@ class IDLE(smach.State):
                                             'Maintain'],
                                    input_keys=['idle_Home'])
         self.flightStatus = flightStatus
-     
+        self.counter = 0
+        
      def execute(self, userdata):
         rospy.loginfo('Executing state IDLE')
         rospy.sleep(self.flightStatus.sleepTime)
         #Should deal with controllers?
-        if self.flightStatus.getMissionDuration()>rospy.Duration(100).to_sec():
-           print ("Waited in idle for too long - goto to MANUAL") 
-           return 'Finish' #- to manual
-        elif self.flightStatus.listener.ctrlThrottle > self.flightStatus.throttleThreshold: 
-           print ("Seems like pilot wants to take off - goto TAKEOFF") 
-           return 'Start'  #- to takeoff
-        else:
-            print("Idle...")
-            return 'Maintain'
+        if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False : #Include a time limit : or self.flightStatus.getMissionDuration()>rospy.Duration(100).to_sec(): 
+##          #Turn off ALL controllers -----<<<<<<<<<<<<<<<<<<
+            print ('All Controllers turned off - we are DONE') 
+            #Waited for a while in idle or one of the switches is OFF
+            print ("AutoPilot if OFF or MissionGo is OFF  --->>> goto MANUAL") 
+            return 'Finish' #- to manual
+        elif self.flightStatus.listener.ctrlThrottle > self.flightStatus.throttleThreshold and self.flightStatus.IsBatteryOK() : 
+            #Throttle is up and there is enough battery
+            print ("Seems like pilot wants to take off and there's enough battery --->>> goto TAKEOFF") 
+            return 'Start'  #- to takeoff
+        print("Idle...")    
+        return 'Maintain'
 
+# define state FOLLOWTRAJECTORY  (This state should be is a template for GoHome or any other follow traj, the only difference is what is the trajectory to follow)
+class FOLLOWTRAJECTORY(smach.State):
+     def __init__(self,flightStatus):
+        smach.State.__init__(self, outcomes=['MissionDone',
+                                            'Aborted_NoBatt',
+                                            'Aborted_Diverge',
+                                            'Maintain'],
+                                   input_keys=['hover_Home'])
+        self.flightStatus = flightStatus
+
+     def execute(self, userdata):
+        rospy.loginfo('Executing state FOLLOWTRAJECTORY')
+        rospy.sleep(self.flightStatus.sleepTime)
+        z_ref = self.flightStatus.getAltitude() #use present altitude as ref
+        if self.flightStatus.AnyErrorDiverge():
+            print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
+            return 'Aborted_Diverge' #->Manual!
+        if not self.flightStatus.IsBatteryOK() or self.flightStatus.listener.MissionGoSwitch == False:
+            print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
+            return 'Aborted_NoBatt' #->Vehicle should LAND
+        if self.flightStatus.IsTimeExceeded() : #Mission Duration Reached
+            print ("Mission Duration Exceeded - Finish") 
+            return 'MissionDone'
+        print("Following Trajectory")
+        return 'Maintain'
+            
 
 
 # define state InitContoller
@@ -185,19 +214,28 @@ class ControllerInit(smach.State):
         Service_in = ControllerRequest()         
         # Designated whether the controller should turn ON or OFF
         Service_in.ON_OFF = True
+        # Designated whether there are controller gains to be adjusted
+        Service_in.input_gain_flag = False
+        # Controller PID gains (regarded only if flag is TRUE)
+        Service_in.gains = [1.0,2.0,3.0]
+
         # Call a function that generates a trajectory for the controller to follow
         if self.str_ParentStateName is 'IDLE':
-            print 'creating a StampedPose to be used as a constant ref signal for the controller'
-            StampedPose                  = self.flightStatus.getCurrentPoseStamped() 
-            #StampedPose                  = PoseStamped() #Construct a StampedPose MSG
-            Service_in.trajectory.append(StampedPose) 
+            if self.flightStatus.IsBatteryOK():
+                print 'creating a StampedPose to be used as a constant ref signal for the controller'
+                StampedPose                  = self.flightStatus.getCurrentPoseStamped() 
+                #StampedPose                  = PoseStamped() #Construct a StampedPose MSG
+                Service_in.trajectory.append(StampedPose) 
+            else:
+                #Should turn all controllers OFF
+                pass
         elif self.str_ParentStateName is 'HOVER':
             print 'creating a StampedPose to be used as a constant ref signal for the controller'
             StampedPose                  = self.flightStatus.getCurrentPoseStamped() 
             #StampedPose                  = PoseStamped() #Construct a StampedPose MSG
             StampedPose.pose.orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
             Service_in.trajectory.append(StampedPose) 
-        else: #TAKEOFF or LAND    
+        else: #TAKEOFF or LAND   
             if self.str_ParentStateName is 'TAKEOFF':
                 z_final = 1.05 * self.flightStatus.safeAltitude
                 print 'Generating trajectory for TAKEOFF'
@@ -210,12 +248,7 @@ class ControllerInit(smach.State):
                                                              z_final,
                                                              v_max,
                                                              delay)
-        
-        # Designated whether there are controller gains to be adjusted
-        Service_in.input_gain_flag = False
-        # Controller PID gains (regarded only if flag is TRUE)
-        Service_in.gains = [1.0,2.0,3.0]
-        
+
         # Send service request
         if self.controlManagement.ControllerClient(Service_in):
             print("Controller turned ON")
@@ -223,19 +256,6 @@ class ControllerInit(smach.State):
         else:
             print("Controller FAILED to turn on")
             return 'Failure'
-
-
-# define state TERMINATE
-class TERMINATE(smach.State):
-     def __init__(self,flightStatus):
-        smach.State.__init__(self, outcomes=['Done'])
-        self.flightStatus = flightStatus
-
-     def execute(self, userdata):
-        rospy.loginfo('Executing state TERMINATE')
-        #Turn off ALL controllers
-        print ('All Controllers turned off - we are DONE') 
-        return 'Done'
 
 
 def getTrajectoryAltitudeProfile(currentPose, z_final, v_max, delay):

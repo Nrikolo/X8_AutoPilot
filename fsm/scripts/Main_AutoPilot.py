@@ -17,7 +17,7 @@ from FlightStatusClass import FlightStatusClass
 #Importing the Controller Management Class definition
 from ControllerManagementClass import ControllerManagementClass
 #Importing the States definitions 
-from FSM_STATES import *
+from fsm_states import *
 
 def main():
     rospy.init_node('TOP_FSM')
@@ -37,13 +37,17 @@ def main():
     sm_top.userdata.Link = 1 #Can be used to transfer data between states, already remaped and stitched
     home                 = Point(0.0, 0.0, 1.0)#Default Home [x,y] position, msg type Point of geometry_msgs 
     
+    #Define Debugging Aid
+    fsm_refresh_rate     = 1.0 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
+    
     #Contruct a FlightStatusIndicator as a member of sm_top
     sm_top.FlightStatus = FlightStatusClass(BattMinimalVoltage,
                                             safeAltitude,
                                             groundLevel,
                                             throttleThreshold,
                                             missionMaxTime,
-                                            home)
+                                            home,
+                                            fsm_refresh_rate)
     #Contruct a ControlManager as a member of sm_top
     sm_top.ControlManager = ControllerManagementClass()
         

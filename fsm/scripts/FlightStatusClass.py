@@ -23,7 +23,7 @@ from ListenerClass import ListenerClass
 
 
 class FlightStatusClass():
-    def __init__(self,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home):
+    def __init__(self,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate):
         print("Initializing Flight Status Object!")
         self.listener               = ListenerClass()
         self.minimalBatteryVoltage  = MinBattVol
@@ -33,7 +33,7 @@ class FlightStatusClass():
         self.missionMaxTime         = MaxTime
         self.throttleThreshold      = throttleThreshold
         self.homeCoordinates        = home #geometry_msgs/Point
-        self.sleepTime              = 0.0 #When entering states, how long to sleep - slows down the FSM
+        self.sleepTime              = FSM_refreshRate #When entering states, how long to sleep - slows down the FSM, used for debugging
     
     
     def getCurrentPoseStamped(self):
@@ -103,18 +103,24 @@ class FlightStatusClass():
         CurrentStampedPose = self.getCurrentPoseStamped()
         dist = Distance('Euclidean',
                         PoseMsg2NumpyArrayPosition(CurrentStampedPose.pose),
-                        PointMsg2NumpyArrayPosition(self.homeCoordinates))        
+                        PointMsg2NumpyArrayPosition(self.homeCoordinates),
+                        3)        
         print("Vehicle is a distance of %s meters away from home " % dist)
         return 0.1*dist 
         
         
     def IsBatteryOK(self):
-        print ('Is battery ok?')
         #Compute whether battery level is sufficient based on present voltage level, battery predefined threshold distance to home
-        if self.listener.batteryVoltage + self.VoltageNeededToGetHome() < self.minimalBatteryVoltage: 
-         return False
+##        print ('\n\nCurrent Battery Voltage' , self.listener.batteryVoltage )        
+##        print ('Minimal Batt Voltage allowed :' , self.minimalBatteryVoltage )
+##        print ('Battery to get HOME:' , self.VoltageNeededToGetHome() )
+        rospy.sleep(2.0)
+        if self.listener.batteryVoltage < self.minimalBatteryVoltage + self.VoltageNeededToGetHome() : 
+            print ('Not Enough Battery')
+            return False
         else :
-         return True
+            print ('We are good, Enough Battery')
+            return True
     
     def window(self,size):
         return numpy.ones(size)/float(size) #Uniform weights

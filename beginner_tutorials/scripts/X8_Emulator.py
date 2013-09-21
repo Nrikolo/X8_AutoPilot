@@ -31,15 +31,15 @@ def X8_Emulator():
         #Generate Signals
         t                           = rospy.Time.now().to_sec()-start_time
 ##        poseStamped.pose            = Pose(Point(random.uniform(0,1), math.sin(2*math.pi*freq*t), math.fabs(2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
-        poseStamped.pose            = Pose(Point(math.cos(2*math.pi*freq*t), math.sin(2*math.pi*freq*t), math.fabs(1.5+2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
+        poseStamped.pose            = Pose(Point(2*math.cos(2*math.pi*freq*t), math.sin(2*math.pi*freq*t), math.fabs(1.5+2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
         poseStamped.header.frame_id = "/Body" #Frame of ref that the trajectory is formualted in
         poseStamped.header.stamp    = rospy.Time.now()
         
-        batt             = 20-0.01*t
-        ctrl_throttle    = 510*math.sin(2*math.pi*freq*t)+200
+        battery          = 15-0.01*t
+        ctrl_throttle    = 510*math.sin(2*math.pi*freq*t)
         
         #Log Signals        
-        rospy.loginfo("Battery Voltage: %s"  , batt)
+        rospy.loginfo("Battery Voltage: %s"  , battery)
         rospy.loginfo("Autopilot Switch: %s" , AutoPilotSwitch)
         rospy.loginfo("MissionGo Switch: %s" , MissionGoSwitch)
         rospy.loginfo("Throttle Command : %s", ctrl_throttle)
@@ -47,7 +47,7 @@ def X8_Emulator():
         print("---------------------------------------------")
         #Publish Signals
         pub_poseStamped.publish(poseStamped)
-        pub_batt.publish(batt)
+        pub_batt.publish(battery)
         pub_AUTOPILOT.publish(AutoPilotSwitch)
         pub_MissionGo.publish(MissionGoSwitch)
         pub_throttle.publish(ctrl_throttle)
