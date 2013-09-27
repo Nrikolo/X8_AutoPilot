@@ -11,6 +11,7 @@ import rospy
 import numpy
 from rospy.numpy_msg import numpy_msg
 from Utility import *
+import sys
 import time
 import random
 import message_filters
@@ -23,9 +24,9 @@ from ListenerClass import ListenerClass
 
 
 class FlightStatusClass():
-    def __init__(self,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate):
+    def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
         print("Initializing Flight Status Object!")
-        self.listener               = ListenerClass()
+        self.listener               = ListenerClass(queue_size,dictionary)
         self.minimalBatteryVoltage  = MinBattVol
         self.groundLevel            = groundlev
         self.safeAltitude           = safeAltitude
@@ -34,57 +35,83 @@ class FlightStatusClass():
         self.throttleThreshold      = throttleThreshold
         self.homeCoordinates        = home #geometry_msgs/Point
         self.sleepTime              = FSM_refreshRate #When entering states, how long to sleep - slows down the FSM, used for debugging
-    
-    
+        self.tolerance              = tolerance
+        
+
     def getCurrentPoseStamped(self):
-        #Accesor Function 
+        """
+        :return: Current (latest) Stamped Pose msg type
+        
+        Accesor Function 
+        """        
         #print self.listener.poseStampedQueue    
         return self.listener.poseStampedQueue[-1]    
     
-    def getAltitude(self):
-        #Accesor Function 
-        return self.getCurrentPoseStamped().pose.position.z
+    def getCurrentState(self,str_state):
+        """
+        :param: str_state: string of the state to be returned , either 'x','y','z'
+        :return: Current (latest) position attribute, either 'x','y','z'
+        
+        Accesor Function 
+        """
+        return getattr(self.getCurrentPoseStamped().pose.position,str_state)    
+    
+    def getCurrentAltitude(self):
+        """
+        :return: Current (latest) altitude 'z' 
+        
+        Accesor Function 
+        """        
+        return self.getCurrentState('z')
     
     def getMissionDuration(self):
+        """
+        :return: Mission duration in seconds thus far
+        
+        Accesor Function for mission duration thus far [seconds]
+        """
         return rospy.Time.now().to_sec()-self.missionStartTime
     
     def IsTimeExceeded(self):
+        """
+        :return: A boolean indicating whether mission duration has exceeded alloted time
+        
+        Function indicated whether alloted time for mission has be exceeded
+        """
         return self.getMissionDuration()>self.missionMaxTime
         
-    
-    def ErrorConverge(self,i):
-        #Compute whether state i has converged 
-##        history_vector = self.listener.poseStampedQueue 
-##        print(history_vector)
-##        N   	       = history_vector.size
-##        average        = numpy.convolve(history_vector,self.window(N),'valid') #Uniform window
-        if random.uniform(0,1)>0 : 
-         return True
+    def ErrorConverge(self,str_attribute):
+        """
+        :param: str_attribute: string of the state to be returned , either 'x','y','z'
+        :return: A boolean indicating whether state has converged ------<<<<<<<SHOULD BE FIXED!
+        
+        Utility function to determine if error of controller has converged
+        """        
+        if self.listener.runningStat[self.listener.dictionary[str_attribute]].Mean() < 0.9: 
+            return True
         else :
-         return False
+            return False
 
-    def ErrorDiverge(self,i):
-        #Compute whether state i is diverging
-       # history_vector = self.listener.poseStampedQueue # Access to the i-th row of the arrayself.poseStampedQueue
-##        N   	       = history_vector.size
-##        average = []
-##        for i in xrange(1,N):
-##            average.append(numpy.convolve(history_vector,self.window(N),'valid')) #Uniform window
-##        
-##        variance = numpy.var(average)
-
-##        if variance > 0.1:
-##            return True
-##        else :
-##            return False
-##        
-        if random.uniform(0,1)>1.0 : 
-         return True
+    def ErrorDiverge(self,str_attribute):
+        """
+        :param: str_attribute: string of the state to be returned , either 'x','y','z'
+        :return: A boolean indicating whether state is in the process of diverging ------<<<<<<<SHOULD BE FIXED!
+        
+        Utility function to determine if error of controller is divering / unstable
+        """        
+        return True
+        if self.listener.runningStat[self.listener.dictionary[str_attribute]].Mean() < 10: 
+            return True
         else :
-         return False
+            return False
+        
 
     def AnyErrorDiverge(self):
-        #Compute whether any state is diverging
+        """
+        :return: A boolean indicating whether ANY is in the process of diverging ------<<<<<<<SHOULD BE FIXED!
+        
+        Utility function to determine if any errors / states are divering / unstable
+        """                
 ##        bool = False 
 ##        for i in xrange(0,2):
 ##            bool *= not self.ErrorDiverge(i)
@@ -95,28 +122,36 @@ class FlightStatusClass():
         else :
             return False
 
-    
-    
     def VoltageNeededToGetHome(self):
-        #Arbitrary scaling from distance to voltage - obviously should be properly mapped
-        #Should be the output from a service call to a motion planner with path energy estimated cost
+        """
+        :return: A float representing the estimated voltage needed to return home from present location
+        
+        Utility function computing/estimating the needed voltage to get home from present location
+        Can be later implemented as a table lookup [Euclidean Dist, Voltage] or an energy mapping of a trajectory generated by a motion planner called
+        """        
+        #Presently implements an arbitrary scaling from distance to voltage 
         CurrentStampedPose = self.getCurrentPoseStamped()
         dist = Distance('Euclidean',
                         PoseMsg2NumpyArrayPosition(CurrentStampedPose.pose),
                         PointMsg2NumpyArrayPosition(self.homeCoordinates),
                         3)        
-        print("Vehicle is a distance of %s meters away from home " % dist)
+        #print("Vehicle is a distance of %s meters away from home " % dist)
         return 0.1*dist 
         
         
     def IsBatteryOK(self):
+        """
+        :return: A boolean indicating whether battery status is ok
+        
+        Function indicating whether battery status is ok (sufficient voltage to continue mission) 
+        taking into account minimal safe voltage level,distance from home coordinates and present voltage
+        """
         #Compute whether battery level is sufficient based on present voltage level, battery predefined threshold distance to home
 ##        print ('\n\nCurrent Battery Voltage' , self.listener.batteryVoltage )        
 ##        print ('Minimal Batt Voltage allowed :' , self.minimalBatteryVoltage )
 ##        print ('Battery to get HOME:' , self.VoltageNeededToGetHome() )
-        rospy.sleep(2.0)
         if self.listener.batteryVoltage < self.minimalBatteryVoltage + self.VoltageNeededToGetHome() : 
-            print ('Not Enough Battery')
+            sys.stdout.write('\rNot Enough Battery...')            
             return False
         else :
             print ('We are good, Enough Battery')

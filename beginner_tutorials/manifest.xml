@@ -10,6 +10,7 @@
   <url>http://ros.org/wiki/beginner_tutorials</url>
   <depend package="std_msgs"/>
   <depend package="geometry_msgs"/>
+  <depend package="quadrotor_msgs"/>
   <depend package="rospy"/>
   <depend package="roscpp"/>
 

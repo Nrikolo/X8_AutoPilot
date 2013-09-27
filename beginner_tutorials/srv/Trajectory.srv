@@ -1,0 +1,11 @@
+#A pose msg representing a the origin of the trajectory
+geometry_msgs/Pose initPose
+
+#A pose msg representing a the end of the trajectory
+geometry_msgs/Pose finalPose
+
+#Representing the geometric tolerance of the trajectory
+float32 tolerance
+------
+#An array of time stamped 3D points representing a trajectory the controller should track
+geometry_msgs/PoseStamped[] trajectory

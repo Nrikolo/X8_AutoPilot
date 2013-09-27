@@ -14,6 +14,7 @@ from ListenerClass import ListenerClass
 
 def main():
     print("In main.py function")
+    rospy.init_node('Test_listener')
     lis = ListenerClass()
     lis.listen("chatter",Float64)
     

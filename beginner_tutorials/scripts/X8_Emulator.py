@@ -3,54 +3,66 @@
 # Topics are the vehicle pose, battery voltage, the throttle stick RC input 
 # and lastly the Autopilot and mission go boolean indicators. 
 
-import roslib; roslib.load_manifest('rospy_tutorials')
+import roslib; roslib.load_manifest('beginner_tutorials')
 import random
 import math
 import rospy
 import sys
 
-from std_msgs.msg import Float64, Bool, Int16
+from std_msgs.msg import Float64
 from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
+from quadrotor_msgs.msg import RadioControl, BatteryStatus
+
 
 def X8_Emulator():
-    #Create Publishers
+    #State a ROS NODE    
+    rospy.init_node('X8_HardwareEmulator', anonymous=True)    
+    #Create Publishers    
     pub_poseStamped = rospy.Publisher('poseStamped', PoseStamped)
-    pub_batt        = rospy.Publisher('battery', Float64)
-    pub_AUTOPILOT   = rospy.Publisher('AUTOPILOT', Bool)
-    pub_MissionGo   = rospy.Publisher('MISSIONGO', Bool)
-    pub_throttle    = rospy.Publisher('ctrl_throttle', Int16)
-    #State a ROS NODE
-    rospy.init_node('X8_HardwareEmulator', anonymous=True)
-    r = rospy.Rate(10) # 10hz    
+    pub_batt        = rospy.Publisher('battery', BatteryStatus)
+    pub_RadioCtrl   = rospy.Publisher('RadioControl', RadioControl)
+    pub_CtrlError   = rospy.Publisher('ControllerError', Float64)
+    
+    r = rospy.Rate(5) # 10hz    
     start_time = rospy.Time.now().to_sec()
     AutoPilotSwitch =       True
     MissionGoSwitch =       True
-    freq            = 0.002 #Frequancy of sinosoidal wave for throttle stick
     poseStamped     = PoseStamped() #Construct a Stamped Pose Object
+    battery         = BatteryStatus()
+    freq            = 0.002 #Frequancy of sinosoidal wave for throttle stick
     while not rospy.is_shutdown():
         #Generate Signals
         t                           = rospy.Time.now().to_sec()-start_time
-##        poseStamped.pose            = Pose(Point(random.uniform(0,1), math.sin(2*math.pi*freq*t), math.fabs(2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
-        poseStamped.pose            = Pose(Point(2*math.cos(2*math.pi*freq*t), math.sin(2*math.pi*freq*t), math.fabs(1.5+2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
+        poseStamped.pose            = Pose(Point(2*math.cos(2*math.pi*freq*t), math.sin(2*math.pi*freq*t), math.fabs(0.8+2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
         poseStamped.header.frame_id = "/Body" #Frame of ref that the trajectory is formualted in
         poseStamped.header.stamp    = rospy.Time.now()
         
-        battery          = 15-0.01*t
-        ctrl_throttle    = 510*math.sin(2*math.pi*freq*t)
+        battery.voltage             = 15-0.05*t
+        battery.current             = 1.2
+        battery.header.stamp        = rospy.Time.now()
+        RadioSignal                 = RadioControl(math.cos(2*math.pi*freq*t),#roll
+                                                   math.cos(2*math.pi*freq*t),#pitch
+                                                   math.cos(2*math.pi*freq*t),#yaw
+                                                   abs(math.sin(2*math.pi*freq*t/10)),#throttle
+                                                   1,           #AutoPilotSwitch aka flap
+                                                   1)           #MissionGo aka gear
+        CtrlError                   = math.cos(2*math.pi*freq*t)
+        
         
         #Log Signals        
-        rospy.loginfo("Battery Voltage: %s"  , battery)
-        rospy.loginfo("Autopilot Switch: %s" , AutoPilotSwitch)
-        rospy.loginfo("MissionGo Switch: %s" , MissionGoSwitch)
-        rospy.loginfo("Throttle Command : %s", ctrl_throttle)
-        rospy.loginfo("Vehicle Pose: %s"     , poseStamped.pose)
+        rospy.loginfo("AutoPilotSwitch: %s", RadioSignal.flap > 0.5)
+        rospy.loginfo("MissionGoSwitch: %s", RadioSignal.gear > 0.5)
+        rospy.loginfo("Throttle Command: %s", RadioSignal.throttle)        
+        rospy.loginfo("Battery Voltage: %s" , battery.voltage)
+        rospy.loginfo("Controller Error  %s"  , CtrlError)        
+        rospy.loginfo("Vehicle Pose:\n %s"  , poseStamped.pose)
+        
         print("---------------------------------------------")
         #Publish Signals
+        pub_CtrlError.publish(CtrlError)        
+        pub_RadioCtrl.publish(RadioSignal)
         pub_poseStamped.publish(poseStamped)
         pub_batt.publish(battery)
-        pub_AUTOPILOT.publish(AutoPilotSwitch)
-        pub_MissionGo.publish(MissionGoSwitch)
-        pub_throttle.publish(ctrl_throttle)
         #Sleep (monitor the publishing rate)
         r.sleep()
     
@@ -58,3 +70,4 @@ if __name__ == '__main__':
     try:
         X8_Emulator()
     except rospy.ROSInterruptException: pass
+

@@ -12,11 +12,16 @@ def handle_Controller(req):
     print ("Received ON_OFF %s" % (req.ON_OFF))
     #print ("Received Trajectory %s" % (req.trajectory))
     print ("Received gain indicator %s" % (req.input_gain_flag))
-    print 'Received Gains, the Proportional is : %5.3f' % req.gains[0] 
+    print ("Received gain indicator %s" % (req.input_gain_flag))    
+    print ("Received Gains : \n Proportional Gain is : %5.3f \n Derivative Gain is : %5.3f \n Integral Gain is : %5.3f" %(req.gains[0], req.gains[1],req.gains[2]))
     
-    # Probability of succesful turn on of controller is 90% 
-    flag = random.uniform(0,1)>0.1
-    #print 'Simulating a flag as %s' % flag
+    if req.ON_OFF:
+        print("Contorller should be turned ON")
+        flag = random.uniform(0,1)>0.1
+    else:
+        print("Contorller should be turned OFF")
+        flag = True
+    
     return ControllerResponse(flag)
 
 def ControllerServer():
