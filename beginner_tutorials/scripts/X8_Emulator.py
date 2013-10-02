@@ -10,31 +10,32 @@ import rospy
 import sys
 
 from std_msgs.msg import Float64
-from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
-from quadrotor_msgs.msg import RadioControl, BatteryStatus
+from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped, Vector3
+from quadrotor_msgs.msg import RadioControl, BatteryStatus, ControllerError
 
 
 def X8_Emulator():
     #State a ROS NODE    
     rospy.init_node('X8_HardwareEmulator', anonymous=True)    
     #Create Publishers    
-    pub_poseStamped = rospy.Publisher('poseStamped', PoseStamped)
+    pub_poseStamped = rospy.Publisher('poseStamped', PoseStamped) 
     pub_batt        = rospy.Publisher('battery', BatteryStatus)
     pub_RadioCtrl   = rospy.Publisher('RadioControl', RadioControl)
-    pub_CtrlError   = rospy.Publisher('ControllerError', Float64)
-    
-    r = rospy.Rate(5) # 10hz    
+    pub_CtrlError   = rospy.Publisher('ControllerError', ControllerError)
+        
+    r = rospy.Rate(1) # 10hz    
     start_time = rospy.Time.now().to_sec()
     AutoPilotSwitch =       True
     MissionGoSwitch =       True
-    poseStamped     = PoseStamped() #Construct a Stamped Pose Object
-    battery         = BatteryStatus()
+    poseStamped     = PoseStamped() #Construct a Stamped Pose Msg
+    battery         = BatteryStatus() #Construct a Battery Status Msg
+    CtrlError       = ControllerError() #Construct a ControllerError Msg
     freq            = 0.002 #Frequancy of sinosoidal wave for throttle stick
     while not rospy.is_shutdown():
         #Generate Signals
         t                           = rospy.Time.now().to_sec()-start_time
         poseStamped.pose            = Pose(Point(2*math.cos(2*math.pi*freq*t), math.sin(2*math.pi*freq*t), math.fabs(0.8+2*math.sin(2*math.pi*freq*t))), Quaternion(0.000, 0.000, 0.000, 1.00))
-        poseStamped.header.frame_id = "/Body" #Frame of ref that the trajectory is formualted in
+        poseStamped.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
         poseStamped.header.stamp    = rospy.Time.now()
         
         battery.voltage             = 15-0.05*t
@@ -46,7 +47,14 @@ def X8_Emulator():
                                                    abs(math.sin(2*math.pi*freq*t/10)),#throttle
                                                    1,           #AutoPilotSwitch aka flap
                                                    1)           #MissionGo aka gear
-        CtrlError                   = math.cos(2*math.pi*freq*t)
+        CtrlError.header.frame_id   = "/world"
+        CtrlError.header.stamp      = rospy.Time.now()
+        CtrlError.error             = Vector3(math.cos(2*math.pi*freq*t),
+                                              math.cos(2*math.pi*freq*t),
+                                              math.cos(2*math.pi*freq*t))
+        CtrlError.error_d           = Vector3(2*math.pi*freq*math.sin(2*math.pi*freq*t),
+                                              2*math.pi*freq*math.sin(2*math.pi*freq*t),
+                                              2*math.pi*freq*math.sin(2*math.pi*freq*t))
         
         
         #Log Signals        

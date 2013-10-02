@@ -21,40 +21,42 @@ from Utility import *
 
 # define state MANUAL
 class MANUAL(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Finish',
-                                             'TOAUTONOMOUS'],
+                                            'Monitor',
+                                            'TOAUTONOMOUS'],
                                    input_keys=['manual_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
 
      def execute(self, userdata):
         rospy.loginfo('Executing state MANUAL')
+        #self.flightStatus.publisher.publish(self.flightStatus.listener.AutoPilotSwitch)
+        self.flightStatus.publisher.publish(self.flightStatus.listener.AutoPilotSwitch)
         rospy.sleep(self.flightStatus.sleepTime)
-        while True:
-            self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)
-            #rospy.loginfo(" I heard  %s  ",  self.flightStatus.homeCoordinates)
-            if self.flightStatus.IsBatteryOK() and self.flightStatus.listener.AutoPilotSwitch == True :
-                print ("AutoPilot switch is ON, there is enough battery ---->>> Transfering control to PC ")                 
-                return 'TOAUTONOMOUS'
-                
-            if self.flightStatus.IsTimeExceeded() : 
-                print ("Mission Duration Exceeded - Finish") 
-                return 'Finish'
+        #rospy.loginfo(" I heard  %s  ",  self.flightStatus.homeCoordinates)
+        if self.flightStatus.IsBatteryOK() and self.flightStatus.listener.AutoPilotSwitch == True :
+            print ("AutoPilot switch is ON, there is enough battery ---->>> Transfering control to PC ")                 
+            return 'TOAUTONOMOUS'
+             
+        if self.flightStatus.IsTimeExceeded() : 
+            print ("Mission Duration Exceeded - Finish") 
+            return 'Finish'
+        else:
+            return 'Monitor'
 
 class AUTONOMOUS_INIT(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self,outcomes=['ToIdle',
                                             'ToHover',
                                             'ToLand',
                                             'Failure'],
                                   input_keys=['AutoInit_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
+        
 
      def execute(self, userdata):
         rospy.loginfo('Executing state AUTONOMOUS_INIT')
-        self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)
+        self.flightStatus.publisher.publish(self.flightStatus.listener.AutoPilotSwitch)
         rospy.sleep(self.flightStatus.sleepTime)
         if self.flightStatus.IsBatteryOK() and self.flightStatus.listener.AutoPilotSwitch == True : 
             #??? and self.flightStatus.ctrlThrottle< userdata.AutoInit_throttleThreshold:
@@ -74,18 +76,16 @@ class AUTONOMOUS_INIT(smach.State):
 
 # define state TAKEOFF
 class TAKEOFF(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Success',
                                              'Aborted_NoBatt',
                                             'Aborted_Diverge',
                                             'Maintain'],
                                    input_keys=['takeoff_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
-
+        
      def execute(self, userdata):
         rospy.loginfo('Executing state TAKEOFF')
-        self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)
         rospy.sleep(self.flightStatus.sleepTime)        
         if self.flightStatus.listener.AutoPilotSwitch == False or  self.flightStatus.AnyErrorDiverge()==True:
             print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
@@ -104,18 +104,16 @@ class TAKEOFF(smach.State):
 
 # define state HOVER
 class HOVER(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['MissionDone',
                                             'Aborted_NoBatt',
                                             'Aborted_Diverge',
                                             'Maintain'],
                                    input_keys=['hover_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
-
+        
      def execute(self, userdata):
         rospy.loginfo('Executing state HOVER')
-        self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)       
         rospy.sleep(self.flightStatus.sleepTime)
         z_ref = self.flightStatus.getCurrentAltitude() #use present altitude as ref
         if self.flightStatus.AnyErrorDiverge():
@@ -133,17 +131,15 @@ class HOVER(smach.State):
                 
 # define state LAND
 class LAND(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Success',
                                             'Failure',
                                             'Maintain'],
                                    input_keys=['land_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
-
+        
      def execute(self, userdata):
         rospy.loginfo('Executing state LAND')
-        self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)       
         rospy.sleep(self.flightStatus.sleepTime)
         if self.flightStatus.AnyErrorDiverge() or not self.flightStatus.IsBatteryOK():
             print ("Vehicle is unstable or battery level low - goto MANUAL")                 
@@ -157,17 +153,15 @@ class LAND(smach.State):
                
 # define state IDLE
 class IDLE(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Finish',
                                              'Start',
                                             'Maintain'],
                                    input_keys=['idle_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
-        
+                
      def execute(self, userdata):
         rospy.loginfo('Executing state IDLE')
-        self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)       
         rospy.sleep(self.flightStatus.sleepTime)
         if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK():
             print ('All Controllers turned off - we are DONE') 
@@ -189,7 +183,7 @@ class CONTROLLER_INIT(smach.State):
         self.controlManagement   = controlManagement
         self.str_ParentStateName = str_ParentStateName #Used to indicate which controller should be turned ON
         self.dict = {'True': 'ON', 'False':'OFF'};
-        self.stateDictionary = {'IDLE': 1, 'HOVER':2,'LAND':3,'TAKEOFF':4};
+        #self.stateDictionary = {'IDLE': 1, 'HOVER':2,'LAND':3,'TAKEOFF':4};
 
     def execute(self,userdata):
         rospy.loginfo('Executing state ControllerInit in %s' , self.str_ParentStateName )
@@ -249,18 +243,16 @@ class CONTROLLER_INIT(smach.State):
 
 # define state FOLLOWTRAJECTORY  (This state should be is a template for GoHome or any other follow traj, the only difference is what is the trajectory to follow)
 class FOLLOW_TRAJECTORY(smach.State):
-     def __init__(self,flightStatus,publisher):
+     def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Arrived',
                                             'Aborted_NoBatt',
                                             'Aborted_Diverge',
                                             'Maintain'],
                                    input_keys=['g_Home'])
         self.flightStatus = flightStatus
-        self.pub          = publisher
-        
+                
      def execute(self, userdata):
         rospy.loginfo('Executing state FOLLOW_TRAJECTORY')
-        self.pub.publish(self.flightStatus.listener.AutoPilotSwitch)       
         rospy.sleep(self.flightStatus.sleepTime)
         if self.flightStatus.AnyErrorDiverge():
             print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 

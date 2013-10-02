@@ -38,7 +38,7 @@ def main():
     home                 = Point(0.0, 0.0, 1.0)#Default Home [x,y,z] position, msg type Point of geometry_msgs 
     tolerance            = 0.02 #[m] for error signal convergence
     queue_size           = 50 #Size of history queue of pose msgs saved for convergence computation
-    dictionary           = {'x' : 0, 
+    dictionary           = {'x' : 0, #Dictionary to map PoseQueue rows to axes
                             'y' : 1,
                             'z' : 2,
                             'qx': 3,
@@ -48,11 +48,12 @@ def main():
     
     #Define Debugging Aid
     fsm_refresh_rate     = 1.0 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
-    
+    #Create a publisher for the FSM to ammounce its state [Autonomous / Manual]
     pub_AutonomousMode = rospy.Publisher('AutonomousMode',Bool)
     
     #Contruct a FlightStatusIndicator as a member of sm_top
-    sm_top.FlightStatus = FlightStatusClass(dictionary,
+    sm_top.FlightStatus = FlightStatusClass(pub_AutonomousMode,
+                                            dictionary,
                                             queue_size,
                                             BattMinimalVoltage,
                                             safeAltitude,
@@ -68,8 +69,8 @@ def main():
     # Open the container
     with sm_top:
         # Add states to the container
-        smach.StateMachine.add('MANUAL', MANUAL(sm_top.FlightStatus,pub_AutonomousMode), 
-                                transitions={'TOAUTONOMOUS':'AUTONOMOUS', 'Finish':'Done'},
+        smach.StateMachine.add('MANUAL', MANUAL(sm_top.FlightStatus), 
+                                transitions={'TOAUTONOMOUS':'AUTONOMOUS','Monitor':'MANUAL', 'Finish':'Done'},
                                 remapping = {'manual_Home':'Link'})        
 #----------------------------------------------------------------------------------------
         # Create an Autonomous (manifold) FSM within the top container
@@ -79,7 +80,7 @@ def main():
         with sm_autonomous:
 
         # Create and add the AutonomousInit SMACH state 
-            smach.StateMachine.add('AUTONOMOUS_INIT', AUTONOMOUS_INIT(sm_top.FlightStatus,pub_AutonomousMode), 
+            smach.StateMachine.add('AUTONOMOUS_INIT', AUTONOMOUS_INIT(sm_top.FlightStatus), 
                                     transitions={'ToIdle':'IDLE', 'ToHover':'HOVER', 'ToLand':'LAND','Failure':'Failure'},
                                     remapping = {'AutoInit_Home':'Auto_Home'})      
 #----------------------------------------------------------------------------------------
@@ -91,7 +92,7 @@ def main():
                                                                                                        'Failure':'ToManual'},
                                                                                             remapping={'idle_Home':'I_Home'})
                 # Create and add the HOVER_MONITOR SMACH state
-                smach.StateMachine.add('IDLE_MONITOR',IDLE(sm_top.FlightStatus,pub_AutonomousMode ),transitions={'Finish':'ToManual',
+                smach.StateMachine.add('IDLE_MONITOR',IDLE(sm_top.FlightStatus),transitions={'Finish':'ToManual',
                                                                                         'Start':'ToTakeoff',
                                                                                         'Maintain':'IDLE_MONITOR'},
                                                                             remapping={'idle_Home':'I_Home'})
@@ -109,7 +110,7 @@ def main():
                                                                                      'Failure':'ToManual'},
                                                                         remapping={'takeoff_Home':'TO_Home'})    
         # Create and add the TAKEOFF_MONITOR state into the takeoff substate machine
-                smach.StateMachine.add('TAKEOFF_MONITOR',TAKEOFF(sm_top.FlightStatus,pub_AutonomousMode ),transitions={'Success':'ToHover',
+                smach.StateMachine.add('TAKEOFF_MONITOR',TAKEOFF(sm_top.FlightStatus),transitions={'Success':'ToHover',
                                                                                             'Maintain':'TAKEOFF_MONITOR',
                                                                                             'Aborted_NoBatt':'ToLand',
                                                                                             'Aborted_Diverge':'ToManual'},
@@ -130,7 +131,7 @@ def main():
                                                                     remapping={'land_Home':'L_Home'})
                                                                         
                 # Create and add the LAND_MONITOR SMACH state into the LAND substate machine
-                smach.StateMachine.add('LAND_MONITOR',LAND(sm_top.FlightStatus,pub_AutonomousMode ),transitions={'Success':'Success',
+                smach.StateMachine.add('LAND_MONITOR',LAND(sm_top.FlightStatus),transitions={'Success':'Success',
                                                                                          'Maintain':'LAND_MONITOR',
                                                                                          'Failure':'Failure'},
                                                             remapping={'land_Home':'L_Home'})
@@ -147,7 +148,7 @@ def main():
                                                                                 'Failure':'ToManual'},
                                                                     remapping={'hover_Home':'H_Home'})
                 # Create and add the HOVER_MONITOR SMACH state into the HOVER sub state machine
-                smach.StateMachine.add('HOVER_MONITOR',HOVER(sm_top.FlightStatus,pub_AutonomousMode ),transitions={'MissionDone':'ToLand',
+                smach.StateMachine.add('HOVER_MONITOR',HOVER(sm_top.FlightStatus),transitions={'MissionDone':'ToLand',
                                                                                          'Maintain':'HOVER_MONITOR',
                                                                                         'Aborted_NoBatt':'ToLand',
                                                                                         'Aborted_Diverge':'ToManual'},
@@ -165,7 +166,7 @@ def main():
                                                                                 'Failure':'ToManual'},
                                                                     remapping={'g_Home':'Gohome_Home'})
                 # Create and add the HOVER_MONITOR SMACH state into the HOVER sub state machine
-                smach.StateMachine.add('GO_HOME_MONITOR',FOLLOW_TRAJECTORY(sm_top.FlightStatus,pub_AutonomousMode ),transitions={'Arrived':'ToHover',
+                smach.StateMachine.add('GO_HOME_MONITOR',FOLLOW_TRAJECTORY(sm_top.FlightStatus),transitions={'Arrived':'ToHover',
                                                                                          'Maintain':'GO_HOME_MONITOR',
                                                                                         'Aborted_NoBatt':'ToManual',
                                                                                         'Aborted_Diverge':'ToManual'},

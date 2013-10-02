@@ -24,9 +24,10 @@ from ListenerClass import ListenerClass
 
 
 class FlightStatusClass():
-    def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
+    def __init__(self,Publisher,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
         print("Initializing Flight Status Object!")
         self.listener               = ListenerClass(queue_size,dictionary)
+        self.publisher              = Publisher
         self.minimalBatteryVoltage  = MinBattVol
         self.groundLevel            = groundlev
         self.safeAltitude           = safeAltitude
@@ -38,6 +39,12 @@ class FlightStatusClass():
         self.tolerance              = tolerance
         
 
+    def getMode(self):
+        """
+        :return: void
+        
+        Accesor function to publish whether FSM is in Autonomous or Manual MManifold
+        """
     def getCurrentPoseStamped(self):
         """
         :return: Current (latest) Stamped Pose msg type
@@ -83,44 +90,48 @@ class FlightStatusClass():
     def ErrorConverge(self,str_attribute):
         """
         :param: str_attribute: string of the state to be returned , either 'x','y','z'
-        :return: A boolean indicating whether state has converged ------<<<<<<<SHOULD BE FIXED!
+        :return: A boolean indicating whether state has converged 
         
         Utility function to determine if error of controller has converged
         """        
-        if self.listener.runningStat[self.listener.dictionary[str_attribute]].Mean() < 0.9: 
+        bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 0.1       
+        bool_error_d = abs(self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean()-0.01)  < 0       
+        if bool_error and bool_error_d :
+            print "Error in " ,str_attribute ,"Converged"
             return True
         else :
+            print "Error in " ,str_attribute ,"Did not Converge"
             return False
 
     def ErrorDiverge(self,str_attribute):
         """
         :param: str_attribute: string of the state to be returned , either 'x','y','z'
-        :return: A boolean indicating whether state is in the process of diverging ------<<<<<<<SHOULD BE FIXED!
+        :return: A boolean indicating whether state is in the process of diverging 
         
         Utility function to determine if error of controller is divering / unstable
         """        
-        return True
-        if self.listener.runningStat[self.listener.dictionary[str_attribute]].Mean() < 10: 
+        #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
+        bool_error_d = abs(self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean()-0.01)  > 0       
+        if bool_error_d :
+            print "Error derivative in " ,str_attribute ,"Diverged"            
             return True
+            
         else :
+            print "Error derivative in " ,str_attribute ,"Did not Diverge"            
             return False
-        
+
 
     def AnyErrorDiverge(self):
         """
-        :return: A boolean indicating whether ANY is in the process of diverging ------<<<<<<<SHOULD BE FIXED!
+        :return: A boolean indicating whether ANY is in the process of diverging 
         
         Utility function to determine if any errors / states are divering / unstable
         """                
-##        bool = False 
-##        for i in xrange(0,2):
-##            bool *= not self.ErrorDiverge(i)
-##        return not bool
-##    
-        if random.uniform(0,1)>1.0 : 
-            return True
-        else :
-            return False
+        bool = False 
+        for str in 'xyz':
+            bool *= not self.ErrorDiverge(str)
+        return not bool
+
 
     def VoltageNeededToGetHome(self):
         """
