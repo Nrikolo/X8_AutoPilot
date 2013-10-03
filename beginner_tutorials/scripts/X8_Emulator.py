@@ -62,7 +62,7 @@ def X8_Emulator():
         rospy.loginfo("MissionGoSwitch: %s", RadioSignal.gear > 0.5)
         rospy.loginfo("Throttle Command: %s", RadioSignal.throttle)        
         rospy.loginfo("Battery Voltage: %s" , battery.voltage)
-        rospy.loginfo("Controller Error  %s"  , CtrlError)        
+        #rospy.loginfo("Controller Error  %s"  , CtrlError)        
         rospy.loginfo("Vehicle Pose:\n %s"  , poseStamped.pose)
         
         print("---------------------------------------------")

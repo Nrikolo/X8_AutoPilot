@@ -25,7 +25,7 @@ class RunningStatClass():
 
     def push(self,x):
         self.m_data.append(x) 
-        print "Data:", self.m_data       
+##        print "Data:", self.m_data       
         if self.m_n < self.m_queuelength:
             self.m_n += 1
             if self.m_n == 1 :
@@ -39,7 +39,7 @@ class RunningStatClass():
             self.m_data.popleft() #remove oldest entry
         #print "New Mean ", self.m_newMean
         #Set up for next iteration
-        print "Data:", self.m_data       
+##        print "Data:", self.m_data       
         self.m_oldMean = self.m_newMean
         self.m_oldSTD  = self.m_newSTD
 

@@ -24,10 +24,9 @@ from ListenerClass import ListenerClass
 
 
 class FlightStatusClass():
-    def __init__(self,Publisher,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
+    def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
         print("Initializing Flight Status Object!")
         self.listener               = ListenerClass(queue_size,dictionary)
-        self.publisher              = Publisher
         self.minimalBatteryVoltage  = MinBattVol
         self.groundLevel            = groundlev
         self.safeAltitude           = safeAltitude
@@ -45,6 +44,8 @@ class FlightStatusClass():
         
         Accesor function to publish whether FSM is in Autonomous or Manual MManifold
         """
+        pass
+        
     def getCurrentPoseStamped(self):
         """
         :return: Current (latest) Stamped Pose msg type
@@ -94,8 +95,12 @@ class FlightStatusClass():
         
         Utility function to determine if error of controller has converged
         """        
-        bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 0.1       
-        bool_error_d = abs(self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean()-0.01)  < 0       
+        e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
+        e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
+        
+        bool_error   =  e_mean < 0.1       
+        bool_error_d = e_d_mean  < 0       
+
         if bool_error and bool_error_d :
             print "Error in " ,str_attribute ,"Converged"
             return True
@@ -110,8 +115,9 @@ class FlightStatusClass():
         
         Utility function to determine if error of controller is divering / unstable
         """        
+        e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
         #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
-        bool_error_d = abs(self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean()-0.01)  > 0       
+        bool_error_d = abs(e_d_mean-0.01)  > 0       
         if bool_error_d :
             print "Error derivative in " ,str_attribute ,"Diverged"            
             return True

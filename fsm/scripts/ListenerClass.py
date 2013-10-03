@@ -13,7 +13,7 @@ from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
 from quadrotor_msgs.msg import RadioControl, BatteryStatus, ControllerError
 from rospy.numpy_msg import numpy_msg 
 from Utility import *
-from RunningStatClass import RunningStatClass 
+from DataMagazineClass import DataMagazineClass 
 import collections  
 
 class ListenerClass():
@@ -49,15 +49,15 @@ class ListenerClass():
         self.ctrlThrottle       = 0
         self.AutoPilotSwitch    = True
         self.MissionGoSwitch    = True
-        self.runningStatPose    = [RunningStatClass('x',queue_size),
-                                  RunningStatClass('y',queue_size),
-                                  RunningStatClass('z',queue_size)]
-        self.runningStatError   = [RunningStatClass('error_x',queue_size),
-                                   RunningStatClass('error_y',queue_size),
-                                   RunningStatClass('error_z',queue_size)]
-        self.runningStatError_d = [RunningStatClass('d_error_x',queue_size),
-                                   RunningStatClass('d_error_y',queue_size),
-                                   RunningStatClass('d_error_z',queue_size)]
+        self.runningStatPose    = [DataMagazineClass('x',queue_size),
+                                  DataMagazineClass('y',queue_size),
+                                  DataMagazineClass('z',queue_size)]
+        self.runningStatError   = [DataMagazineClass('error_x',queue_size),
+                                   DataMagazineClass('error_y',queue_size),
+                                   DataMagazineClass('error_z',queue_size)]
+        self.runningStatError_d = [DataMagazineClass('d_error_x',queue_size),
+                                   DataMagazineClass('d_error_y',queue_size),
+                                   DataMagazineClass('d_error_z',queue_size)]
         
 
     def RadioControl_callback(self,data):
