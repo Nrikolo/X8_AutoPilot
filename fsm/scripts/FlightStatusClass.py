@@ -5,7 +5,7 @@
 #Most function return a boolean indicator partaining to the query requested. 
 
 
-PKG = 'rospy_tutorials' # this package name
+PKG = 'fsm' # this package name
 import roslib; roslib.load_manifest(PKG)
 import rospy
 import numpy
@@ -19,13 +19,14 @@ import message_filters
 from std_msgs.msg import Float64, Bool, Int16
 from geometry_msgs.msg import Pose, Point, Quaternion
 from rospy.numpy_msg import numpy_msg 
-
+#Import the Listerner and Logger class
 from ListenerClass import ListenerClass
 
 
 class FlightStatusClass():
     def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
         print("Initializing Flight Status Object!")
+        # For Dox on the following see calling function, Main_AutoPilot.py
         self.listener               = ListenerClass(queue_size,dictionary)
         self.minimalBatteryVoltage  = MinBattVol
         self.groundLevel            = groundlev
@@ -33,9 +34,15 @@ class FlightStatusClass():
         self.missionStartTime       = rospy.Time.now().to_sec()
         self.missionMaxTime         = MaxTime
         self.throttleThreshold      = throttleThreshold
-        self.homeCoordinates        = home #geometry_msgs/Point
-        self.sleepTime              = FSM_refreshRate #When entering states, how long to sleep - slows down the FSM, used for debugging
-        self.tolerance              = tolerance
+        self.homeCoordinates        = home 
+        self.sleepTime              = FSM_refreshRate 
+        self.tolerance              = tolerance 
+                
+        # self.mission_stage : self indicating autonomous version of MissionGoSwitch. 
+        # FSM starts with OUTBOUND but determines and alters the stage on its own based on events
+        # OUTBOUND means vehicle should proceed forward in mission. 
+        # INBOUND means it should revert backwards TrajFollow->GoHome->Hover->Land->Idle->Turns Motors Off        
+        self.mission_stage          = 'OUTBOUND' 
         
 
     def getMode(self):
@@ -46,6 +53,14 @@ class FlightStatusClass():
         """
         pass
         
+    def getCurrentBatteryVoltage(self):
+        """
+        :return: Current (latest) Stamped Pose msg type
+        
+        Accesor Function 
+        """        
+        return self.listener.self.batteryVoltage
+    
     def getCurrentPoseStamped(self):
         """
         :return: Current (latest) Stamped Pose msg type
@@ -98,8 +113,8 @@ class FlightStatusClass():
         e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
         
-        bool_error   =  e_mean < 0.1       
-        bool_error_d = e_d_mean  < 0       
+        bool_error   =  abs(e_mean) < 0.1       
+        bool_error_d =  abs(e_d_mean-0.1)  < 0.1       
 
         if bool_error and bool_error_d :
             print "Error in " ,str_attribute ,"Converged"
@@ -107,7 +122,20 @@ class FlightStatusClass():
         else :
             print "Error in " ,str_attribute ,"Did not Converge"
             return False
-
+    
+    #Nir - 2013-10-03 : The following function should be changed! would falsly indicate convergence when trajectory tracking is very good. 
+    #Can be solved by splitting the control activation and ref layer from the FSM
+    def PositionErrorConverge(self):
+        """
+        :param: void
+        
+        :return: A boolean indicating whether position error has converged and velocity is ~zero (vehicle is hovering)
+        """
+        bool = True 
+        for str in 'xyz':
+            bool *= self.ErrorConverge(str)
+        return bool
+    
     def ErrorDiverge(self,str_attribute):
         """
         :param: str_attribute: string of the state to be returned , either 'x','y','z'
@@ -117,17 +145,18 @@ class FlightStatusClass():
         """        
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
         #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
-        bool_error_d = abs(e_d_mean-0.01)  > 0       
+        #print "e_d_mean", e_d_mean
+        bool_error_d = abs(e_d_mean)  > 0.1       
         if bool_error_d :
             print "Error derivative in " ,str_attribute ,"Diverged"            
             return True
             
         else :
-            print "Error derivative in " ,str_attribute ,"Did not Diverge"            
+##            print "Error derivative in " ,str_attribute ,"Did not Diverge"            
             return False
 
 
-    def AnyErrorDiverge(self):
+    def PositionErrorDiverge(self):
         """
         :return: A boolean indicating whether ANY is in the process of diverging 
         
@@ -136,7 +165,7 @@ class FlightStatusClass():
         bool = False 
         for str in 'xyz':
             bool *= not self.ErrorDiverge(str)
-        return not bool
+        return bool
 
 
     def VoltageNeededToGetHome(self):
@@ -153,7 +182,7 @@ class FlightStatusClass():
                         PointMsg2NumpyArrayPosition(self.homeCoordinates),
                         3)        
         #print("Vehicle is a distance of %s meters away from home " % dist)
-        return 0.1*dist 
+        return 0 
         
         
     def IsBatteryOK(self):

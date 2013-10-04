@@ -1,0 +1,19 @@
+<launch>
+<!-- geometry <char width>x<char height>+<left position [pixel]>+<top position [pixel]>
+-->
+
+<!-- Start the node emulating the vehicle -->
+  <node name="X8_Emulator"      pkg="beginner_tutorials" type="X8_Emulator.py" output = "screen" launch-prefix = "xterm -geometry 100x35+10+10 -e " > </node>
+
+<!-- Start the node acting as the controller interface-->
+  <node name="ControllerServer" pkg="beginner_tutorials" type="ControllerServer.py" output = "screen" launch-prefix = "xterm -geometry 100x35+600+10 -e" > </node>
+
+<!-- Start the Finite-State-Machine -->
+  <node name="FSM"              pkg="fsm"                type="Main_AutoPilot.py" output = "screen" launch-prefix = "xterm -geometry 200x35+10+1000 -e">
+	<remap from = "battery"         to = "x8/output/battery" /> 
+    <remap from = "poseStamped"     to = "x8/output/pose" /> 
+    <remap from = "ControllerError" to = "controller/error" /> 
+    <remap from = "RadioControl"    to = "x8/input/radio_control" /> 
+	
+  </node>
+</launch>

@@ -123,7 +123,7 @@ def getTrajectoryAltitudeProfile(currentPoseStamped, z_final, v_max, tolerance):
     i=0
     while True: #no more than 10 sec
         StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
-        StampedPose.header.frame_id = "/Body" #Frame of ref that the trajectory is formualted in
+        StampedPose.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
         t                           = TrajectoryStartTime + rospy.Duration(float(i)/frequency)        #create a time instance
         z                           = z_init + (z_final - z_init)/(1+math.exp(-v_max*(t.to_sec()-delay)));    #compute its height
         #print("Test traj : At time {} z value is {}".format(t.to_sec(),z))

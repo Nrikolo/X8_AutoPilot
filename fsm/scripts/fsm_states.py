@@ -24,16 +24,16 @@ class MANUAL(smach.State):
      def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Finish',
                                             'Monitor',
-                                            'TOAUTONOMOUS'],
-                                   input_keys=['mission_stage_in'])
+                                            'TOAUTONOMOUS'])
+##                                   input_keys=['manual_mission_stage_in'])
         self.flightStatus = flightStatus
 
      def execute(self, userdata):
         rospy.loginfo('Executing state MANUAL')
-        print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
         rospy.sleep(self.flightStatus.sleepTime)
         #rospy.loginfo(" I heard  %s  ",  self.flightStatus.homeCoordinates)
-        if ( self.flightStatus.IsBatteryOK() ) and ( self.flightStatus.listener.AutoPilotSwitch == True ) and ( userdata.mission_stage_in is 'OUTBOUND' ):
+        if ( self.flightStatus.IsBatteryOK() ) and ( self.flightStatus.listener.AutoPilotSwitch == True ) and ( self.flightStatus.mission_stage is 'OUTBOUND' ):
             print ("AutoPilot switch is ON, there is enough battery ---->>> Transfering control to PC ")                 
             return 'TOAUTONOMOUS'
              
@@ -48,19 +48,16 @@ class AUTONOMOUS_INIT(smach.State):
         smach.State.__init__(self,outcomes=['ToIdle',
                                             'ToHover',
                                             'ToLand',
-                                            'Failure'],
-                                  input_keys=['mission_stage_in'],
-                                  output_keys=['mission_stage_out'])
+                                            'Failure'])
+##                                  input_keys=['AutoInit_mission_stage_in'],
+##                                  output_keys=['AutoInit_mission_stage_out'])
         self.flightStatus = flightStatus
         
 
      def execute(self, userdata):
         rospy.loginfo('Executing state AUTONOMOUS_INIT')
-        print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
         rospy.sleep(self.flightStatus.sleepTime)
-        userdata.mission_stage_out  = userdata.mission_stage_in #Default
-        userdata.mission_stage_out = userdata.mission_stage_in #Default mission stage
-        print ("Default Mission Stage coming in: %s " %userdata.mission_stage_out)
         if self.flightStatus.IsBatteryOK() and self.flightStatus.listener.AutoPilotSwitch == True : 
             #??? and self.flightStatus.ctrlThrottle< userdata.AutoInit_throttleThreshold:
             z = self.flightStatus.getCurrentAltitude()
@@ -72,12 +69,11 @@ class AUTONOMOUS_INIT(smach.State):
                 return 'ToIdle'
             else :
                 print ("Vehicle in intermediate altitude - goto LAND") 
-                userdata.mission_stage_out = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
-                print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+                self.flightStatus.mission_stage = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
                 return 'ToLand' #Intermediate altitude - LAND!
         else:
-            userdata.mission_stage_out = 'INBOUND' #Should not re attampt to restart mission one in MANUAL
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+            self.flightStatus.mission_stage = 'INBOUND' #Should not re attampt to restart mission one in MANUAL
+##            print ("Mission Stage coming out: %s " %userdata.AutoInit_mission_stage_out)
             return 'Failure'
 
 
@@ -87,70 +83,63 @@ class TAKEOFF(smach.State):
         smach.State.__init__(self, outcomes=['Success',
                                              'Aborted_NoBatt',
                                             'Aborted_Diverge',
-                                            'Maintain'],
-                                    input_keys  = ['mission_stage_in'],
-                                    output_keys = ['mission_stage_out'])
+                                            'Maintain'])
+##                                    input_keys  = ['TakeOff_mission_stage_in'],
+##                                    output_keys = ['TakeOff_mission_stage_out'])
         self.flightStatus = flightStatus
         
      def execute(self, userdata):
         rospy.loginfo('Executing state TAKEOFF')
-        print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
-        userdata.mission_stage_out  = userdata.mission_stage_in #Default
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
         rospy.sleep(self.flightStatus.sleepTime)        
-        if ( self.flightStatus.listener.AutoPilotSwitch == False ) or  ( self.flightStatus.AnyErrorDiverge()== True ):
+        if ( self.flightStatus.listener.AutoPilotSwitch == False ) or  ( self.flightStatus.PositionErrorDiverge()== True ):
             print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
-            userdata.mission_stage_out  = 'INBOUND' #Should not re attampt to goto Autonomous Menifold
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+            self.flightStatus.mission_stage = 'INBOUND' #Should not re attampt to goto Autonomous Menifold
             return 'Aborted_Diverge'
-        elif (self.flightStatus.listener.MissionGoSwitch == False ) or ( self.flightStatus.IsBatteryOK()== False ) or (userdata.mission_stage_in is 'INBOUND'):
+        elif (self.flightStatus.listener.MissionGoSwitch == False ) or ( self.flightStatus.IsBatteryOK()== False ) or (self.flightStatus.mission_stage is 'INBOUND'):
             print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
-            userdata.mission_stage_out  = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+            self.flightStatus.mission_stage = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
             return 'Aborted_NoBatt'
         if self.flightStatus.ErrorConverge('z')==True: 
             print ("Takeoff complete and succeful - goto HOVER")
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
             return 'Success'
         print ("TakingOff...")#Later should be mapped to GOHOME state        
-        print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+##        print ("Mission Stage coming out: %s " %userdata.TakeOff_mission_stage_out)
         return 'Maintain'
 
             
-
-
 # define state HOVER
 class HOVER(smach.State):
      def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['MissionDone',
                                             'Aborted_NoBatt',
                                             'Aborted_Diverge',
-                                            'Maintain'],
-                                    input_keys  = ['mission_stage_in'],
-                                    output_keys = ['mission_stage_out'])
+                                            'Maintain'])
+##                                    input_keys  = ['Hover_mission_stage_in'],
+##                                    output_keys = ['Hover_mission_stage_out'])
         self.flightStatus = flightStatus
         
      def execute(self, userdata):
         rospy.loginfo('Executing state HOVER')
-        print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
-        userdata.mission_stage_out  =  userdata.mission_stage_in
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
         rospy.sleep(self.flightStatus.sleepTime)
         z_ref = self.flightStatus.getCurrentAltitude() #use present altitude as ref
-        if self.flightStatus.AnyErrorDiverge():
+        if self.flightStatus.PositionErrorDiverge():
             print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
-            userdata.mission_stage_out  = 'INBOUND' #Should not re attampt to goto Autonomous Menifold
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+            self.flightStatus.mission_stage = 'INBOUND' #Should not re attampt to goto Autonomous Menifold
             return 'Aborted_Diverge' #->Manual!
-        if ( not self.flightStatus.IsBatteryOK() ) or (self.flightStatus.listener.MissionGoSwitch == False) or (userdata.mission_stage_in is 'INBOUND'):
-            print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
-            userdata.mission_stage_out  = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+        if ( not self.flightStatus.IsBatteryOK() ) or (self.flightStatus.listener.MissionGoSwitch is False) or (self.flightStatus.mission_stage is 'INBOUND'):
+##            print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
+##            print "battery level: " ,self.flightStatus.getCurrentBatteryVoltage()
+##            print "mission go switch: " ,self.flightStatus.listener.MissionGoSwitch             
+##            print self.flightStatus.mission_stage
+            self.flightStatus.mission_stage = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
             return 'Aborted_NoBatt' #->Vehicle should LAND
         if self.flightStatus.IsTimeExceeded() : #Mission Duration Reached
             print ("Mission Duration Exceeded - Finish") 
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
             return 'MissionDone'
         print("Hovering....")
-        print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+##        print ("Mission Stage coming out: %s " %userdata.Hover_mission_stage_out)
         return 'Maintain'
             
                 
@@ -164,10 +153,10 @@ class LAND(smach.State):
         
      def execute(self, userdata):
         rospy.loginfo('Executing state LAND')
-        #print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
+        self.flightStatus.mission_stage = 'INBOUND' #Vehicle is LANDING, should not attempt to take off once landed
         rospy.sleep(self.flightStatus.sleepTime)
-        userdata.land_Home  = 'INBOUND' #Should not re attampt to TAKEOFF once LANDED
-        if self.flightStatus.AnyErrorDiverge() :
+        if self.flightStatus.PositionErrorDiverge() :
             print ("Vehicle is unstable - goto MANUAL")                 
             return 'Failure' #->Manual!
         if self.flightStatus.ErrorConverge('z'):    
@@ -182,31 +171,64 @@ class IDLE(smach.State):
      def __init__(self,flightStatus):
         smach.State.__init__(self, outcomes=['Finish',
                                              'Start',
-                                            'Maintain'],
-                                   input_keys  = ['mission_stage_in'],
-                                    output_keys = ['mission_stage_out'])
+                                            'Maintain'])
+##                                   input_keys  = ['Idle_mission_stage_in'],
+##                                    output_keys = ['Idle_mission_stage_out'])
         self.flightStatus = flightStatus
                 
      def execute(self, userdata):
         rospy.loginfo('Executing state IDLE')
-        print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
-        userdata.mission_stage_out  =  userdata.mission_stage_in
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
         rospy.sleep(self.flightStatus.sleepTime)
-        if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False or (userdata.mission_stage_in is 'INBOUND') or  not self.flightStatus.IsBatteryOK() :
+        if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False or (self.flightStatus.mission_stage is 'INBOUND') or  not self.flightStatus.IsBatteryOK() :
             print ('All Controllers turned off - we are DONE') 
             #Waited for a while in idle or one of the switches is OFF
             print ("AutoPilot if OFF or MissionGo is OFF  --->>> goto MANUAL") 
-            userdata.mission_stage_out  =  'INBOUND'
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+            self.flightStatus.mission_stage =  'INBOUND'
             return 'Finish' #- to manual
-        elif self.flightStatus.listener.ctrlThrottle > self.flightStatus.throttleThreshold and self.flightStatus.IsBatteryOK() and (userdata.mission_stage_in is 'OUTBOUND'): 
+        elif self.flightStatus.listener.ctrlThrottle > self.flightStatus.throttleThreshold and self.flightStatus.IsBatteryOK() and (self.flightStatus.mission_stage is 'OUTBOUND'): 
             #Throttle is up and there is enough battery
             print ("Seems like pilot wants to take off and there's enough battery --->>> goto TAKEOFF") 
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
             return 'Start'  #- to takeoff
         print("Idle...")    
-        print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
+##        print ("Mission Stage coming out: %s " %userdata.Idle_mission_stage_out)
         return 'Maintain'
+
+# define state FOLLOWTRAJECTORY  (This state should be is a template for GoHome or any other follow traj, the only difference is what is the trajectory to follow)
+class FOLLOW_TRAJECTORY(smach.State):
+     def __init__(self,flightStatus):
+        smach.State.__init__(self, outcomes=['Arrived',
+                                            'Aborted_NoBatt',
+                                            'Aborted_Diverge',
+                                            'Maintain'])
+##                                   input_keys  = ['TrajFol_mission_stage_in'],
+##                                    output_keys = ['TrajFol_mission_stage_out'])
+        self.flightStatus = flightStatus
+                
+     def execute(self, userdata):
+        rospy.loginfo('Executing state FOLLOW_TRAJECTORY')
+        print ("Mission Stage coming in: %s " %self.flightStatus.mission_stage)
+        rospy.sleep(self.flightStatus.sleepTime)
+        if self.flightStatus.PositionErrorDiverge():
+            print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
+            self.flightStatus.mission_stage = 'INBOUND'
+            return 'Aborted_Diverge' #->Manual!
+        if not self.flightStatus.IsBatteryOK() or self.flightStatus.listener.MissionGoSwitch == False:
+            print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
+            self.flightStatus.mission_stage  = 'INBOUND'
+            return 'Aborted_NoBatt' #->Vehicle should LAND
+        if self.flightStatus.IsTimeExceeded() : #Mission Duration Reached
+            print ("Mission Duration Exceeded - Finish") 
+            self.flightStatus.mission_stage  = 'INBOUND'
+            return 'Aborted_NoBatt'
+        if self.flightStatus.ErrorConverge('z'):
+            print ("Seems like I have arrived at destination --->>> goto HOVER") 
+            return 'Arrived'
+        print("Following Trajectory")
+        self.flightStatus.mission_stage  = 'OUTBOUND'
+##        print ("Mission Stage coming out: %s " %userdata.TrajFol_mission_stage_out)
+        return 'Maintain'
+            
 
 # define state InitContoller
 class CONTROLLER_INIT(smach.State):
@@ -273,44 +295,4 @@ class CONTROLLER_INIT(smach.State):
         else:
             print("Controller FAILED to turn " + self.dict[str(Service_in.ON_OFF)])
             return 'Failure'
-
-# define state FOLLOWTRAJECTORY  (This state should be is a template for GoHome or any other follow traj, the only difference is what is the trajectory to follow)
-class FOLLOW_TRAJECTORY(smach.State):
-     def __init__(self,flightStatus):
-        smach.State.__init__(self, outcomes=['Arrived',
-                                            'Aborted_NoBatt',
-                                            'Aborted_Diverge',
-                                            'Maintain'],
-                                   input_keys  = ['mission_stage_in'],
-                                    output_keys = ['mission_stage_out'])
-        self.flightStatus = flightStatus
-                
-     def execute(self, userdata):
-        rospy.loginfo('Executing state FOLLOW_TRAJECTORY')
-        print ("Mission Stage coming in: %s " %userdata.mission_stage_in)
-        userdata.mission_stage_out  =  userdata.mission_stage_in
-        rospy.sleep(self.flightStatus.sleepTime)
-        if self.flightStatus.AnyErrorDiverge():
-            print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
-            userdata.mission_stage_out  = 'INBOUND'
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
-            return 'Aborted_Diverge' #->Manual!
-        if not self.flightStatus.IsBatteryOK() or self.flightStatus.listener.MissionGoSwitch == False:
-            print ("Either pilot wants vehicle to come home or there is no Batt - goto LAND")#Later should be mapped to GOHOME state
-            userdata.mission_stage_out  = 'INBOUND'
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
-            return 'Aborted_NoBatt' #->Vehicle should LAND
-        if self.flightStatus.IsTimeExceeded() : #Mission Duration Reached
-            print ("Mission Duration Exceeded - Finish") 
-            userdata.mission_stage_out  = 'INBOUND'
-            print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
-            return 'Aborted_NoBatt'
-        if self.flightStatus.ErrorConverge('z'):
-            print ("Seems like I have arrived at destination --->>> goto HOVER") 
-            return 'Arrived'
-        print("Following Trajectory")
-        userdata.mission_stage_out  = 'OUTBOUND'
-        print ("Mission Stage coming out: %s " %userdata.mission_stage_out)
-        return 'Maintain'
-            
 

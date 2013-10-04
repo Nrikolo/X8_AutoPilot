@@ -1,6 +1,0 @@
-<launch>
-  <node name="X8_Emulator"      pkg="beginner_tutorials" type="X8_Emulator.py" />
-  <node name="ControllerServer" pkg="beginner_tutorials" type="ControllerServer.py" />
-  <node name="FSM"              pkg="fsm"                type="Main_AutoPilot.py" />
-</launch>
-

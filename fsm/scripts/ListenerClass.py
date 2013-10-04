@@ -18,7 +18,7 @@ import collections
 
 class ListenerClass():
     def __init__(self,queue_size,dictionary):
-        print("Initializing Listener Object!")
+        print("\nInitializing Listener Object!")
         #Define Dictionary 
         self.dictionary       = dictionary
         #Define topics to which the listener should subscribe (should be imported from a parameter server later)
@@ -28,25 +28,27 @@ class ListenerClass():
         ControllerError_topic = 'ControllerError'
         RadioControl_topic    = 'RadioControl'
         #Create subscribers to those topics (msg_type should also be loaded from server)
-        print("Starting to Listen!")
+        print("\nStarting to Listen!")
         self.subscriber_RadioControl   = rospy.Subscriber(RadioControl_topic,
                                                           RadioControl,
                                                           self.RadioControl_callback)        
+        
         self.subscriber_batteryVoltage = rospy.Subscriber(batteryVoltage_topic,
                                                           BatteryStatus,
                                                           self.battery_callback)        
+
         self.subscriber_ControllerError= rospy.Subscriber(ControllerError_topic,
                                                           ControllerError,
                                                           self.ControllerError_callback)        
+
         self.subscriber_pose           = rospy.Subscriber(poseStamped_topic,
                                                           PoseStamped,
                                                           self.poseStamped_callback)       
-        #self.pose_cache = message_filters.Cache(self.subscriber_pose, 100)
-        #self.pose_cache.registerCallback(self.pose_callback)
+        
         #Initialize the data loggers for the listener 
-        self.batteryVoltage     = 15
+        self.batteryVoltage     = float
         self.poseStampedQueue   = collections.deque([],queue_size)
-        self.ctrlThrottle       = 0
+        self.ctrlThrottle       = float
         self.AutoPilotSwitch    = True
         self.MissionGoSwitch    = True
         self.runningStatPose    = [DataMagazineClass('x',queue_size),
@@ -62,9 +64,15 @@ class ListenerClass():
 
     def RadioControl_callback(self,data):
         #rospy.loginfo(rospy.get_caller_id() + " I heard  %s  ",  data)
+        # --------------------------------------------        
+        # flap  |  AutoPilotSwitch  |   MissionGoSwitch |
+        # --------------------------------------------
+        #  -1   |        OFF        |   OFF (Irrelevant)|
+        #   0   |        ON         |   OFF             |
+        #   1   |        ON         |   ON              |
         self.ctrlThrottle     = data.throttle
         self.AutoPilotSwitch  = data.flap >= 0
-        self.MissionGoSwitch  = data.flap == -1
+        self.MissionGoSwitch  = data.flap == 1
         
         
     def battery_callback(self,data):
