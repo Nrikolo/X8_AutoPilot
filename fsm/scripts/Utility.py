@@ -7,7 +7,48 @@ import numpy
 import math
 from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
 
+class switch(object):
+    def __init__(self, value):
+        self.value = value
+        self.fall = False
 
+    def __iter__(self):
+        """Return the match method once, then stop"""
+        yield self.match
+        raise StopIteration
+    
+    def match(self, *args):
+        """Indicate whether or not to enter a case suite"""
+        if self.fall or not args:
+            return True
+        elif self.value in args: # changed for v1.5, see below
+            self.fall = True
+            return True
+        else:
+            return False
+
+
+### The following example is pretty much the exact use-case of a dictionary,
+### but is included for its simplicity. Note that you can include statements
+### in each suite.
+##v = 'ten'
+##for case in switch(v):
+##    if case('one'):
+##        print 1
+##        break
+##    if case('two'):
+##        print 2
+##        break
+##    if case('ten'):
+##        print 10
+##        break
+##    if case('eleven'):
+##        print 11
+##        break
+##    if case(): # default, could also just omit condition or 'if True'
+##        print "something else!"
+##        # No need to break here, it'll stop anyway
+##        
 def PoseMsg2NumpyArray(pose_msg):
     """
     :param: pose_msg: A ros/geometry_msgs/Pose type msg
@@ -15,6 +56,7 @@ def PoseMsg2NumpyArray(pose_msg):
     
     Converts ros/geometry_msgs/Pose to a numpy array
     """
+    #print "PoseMsg2NumpyArray : ", pose_msg
     v =  numpy.array([pose_msg.position.x,
                     pose_msg.position.y,
                     pose_msg.position.z,
@@ -26,12 +68,12 @@ def PoseMsg2NumpyArray(pose_msg):
 
 def PoseMsg2NumpyArrayPosition(pose_msg):
     """
-    :param pose_msg: A ros/geometry_msgs/Position type msg
+    :param pose_msg: A ros/geometry_msgs/Pose type msg
     :return: A numpy array size [3,1] holds [x,y,z]
     
-    Converts ros/geometry_msgs/Pose.position to a numpy array
+    Converts ros/geometry_msgs/Pose to a numpy array
     """
-    
+    #print "PoseMsg2NumpyArrayPosition: " , pose_msg
     v = PoseMsg2NumpyArray(pose_msg)
     v = v[0:3]
     return v
@@ -70,7 +112,7 @@ def Distance(str_metric, array_1, array_2, dim):
         else:
             return EuclideanPlanarDistance(array_1, array_2,dim)
 
-def EuclideanPlanarDistance( array_1, array_2, dim):
+def EuclideanPlanarDistance( array_1, array_2,dim):
     """
     :param array_1 : A numpy array
     :param array_2 : A numpy array
@@ -78,12 +120,14 @@ def EuclideanPlanarDistance( array_1, array_2, dim):
     :return: A float measuring the Euclidean distance two arrays
     
     Computed the Euclidean metric of the first dim  dimesions between two numpy arrays"""
-    
-    diff = array_1[0:dim-1]-array_2[0:dim-1]    
+##    print "\narray_1:", array_1
+##    print "\narray_2:", array_2
+    diff = array_1[0:dim]-array_2[0:dim]    
+##    print "\ndifference between arrays", diff
     return numpy.linalg.norm(diff,2)
 
 
-def ManhattenPlanarDistance( array_1, array_2, dim):
+def ManhattenPlanarDistance( array_1, array_2, dim=3):
     """
     :param array_1 : A numpy array
     :param array_2 : A numpy array
@@ -92,34 +136,35 @@ def ManhattenPlanarDistance( array_1, array_2, dim):
     
     Computed the Manhatten metric of the first dim dimesions between two numpy arrays"""
 
-    diff = array_1[0:dim-1]-array_2[0:dim-1]    
+    diff = array_1[0:dim]-array_2[0:dim]    
     return numpy.linalg.norm(diff,1)
 
 
-def getTrajectoryAltitudeProfile(currentPoseStamped, z_final, v_max, tolerance): 
+def getTrajectoryAltitudeProfile(currentPoseStamped, TargetPose, tolerance): 
     #Function should be formulated as a motion planner wrapped as a service
     """
     :param currentPoseStamped: A ros/geometry_msgs/PoseStamped message
-    :param z_final : A float indicating target altitude
-    :param v_max : A float indicating maximal rate
+    :param TargetPose : A ros/geometry_msgs/Pose message indicating target pose
     :param tolerance : A float indicating maximal tolerance between sigamoid an actual height
     :return: An array of ros/geometry_msgs/PoseStamped messages
     
-    Generates an altitude proflie for TAKEOFF/LAND based on 
+    Generates an altitude proflie for TAKEOFF/LAND based on a sigamoid
     """  
     
     #Ref signal frequency
     frequency         = 100 #[Hz]
     #Use current position [x,y] constant and current z as lower asymptote of sigamoid
-    x      = currentPoseStamped.pose.position.x
-    y      = currentPoseStamped.pose.position.y
-    z_init = currentPoseStamped.pose.position.z
-    quat   = Quaternion(0.0, 0.0, 0.0, 1.0)
-    delay  = math.log(abs(z_init-z_final)/tolerance-1)/v_max
+    x       = currentPoseStamped.pose.position.x
+    y       = currentPoseStamped.pose.position.y
+    z_init  = currentPoseStamped.pose.position.z
+    z_final = TargetPose.position.z
+    quat    = Quaternion(0.0, 0.0, 0.0, 1.0)
+    v_max   = abs(z_final-z_init)/2.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
+    delay   = math.log((abs(z_init-z_final)/tolerance) - 1)/v_max
     #Loop to populate trajectory with StampedPoses instances
     trajectory = [] # z = z_init + (z_final - z_init)./(1+exp(-v_max*(t-delay-tNOW))));    
     TrajectoryStartTime = rospy.Time()
-    print ("Genereting an altitude profile from z =  {} [m] -->> z = {} [m]".format(z_init , z_final))
+    print ("\nGenereting an altitude profile from z =  {} [m] -->> z = {} [m]".format(z_init , z_final))
     i=0
     while True: #no more than 10 sec
         StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
@@ -136,9 +181,65 @@ def getTrajectoryAltitudeProfile(currentPoseStamped, z_final, v_max, tolerance):
         if abs(z-z_final) < tolerance:
             #print ("trajectory length is {}".format(i))            
             break
-        elif i>10*frequency:
-            print ("Trajectory is more than 10 seconds long, truncated now! ")
+##        elif i>10*frequency:
+##            print ("Trajectory is more than 10 seconds long, truncated now! ")
+##            break
+    print ("\nTrajectory start is: {}".format(trajectory[0].pose.position))
+    print ("\nTrajectory end is: {}".format(trajectory[-1].pose.position))
+    return trajectory
+
+def getTrajectory(currentPose, TargetPose, tolerance): 
+    #Function should be formulated as a motion planner wrapped as a service
+    """
+    :param currentPoseStamped: A ros/geometry_msgs/PoseStamped message
+    :param TargetPose : A ros/geometry_msgs/Pose message indicating target pose
+    :param tolerance : A float indicating maximal tolerance between sigamoid an actual height
+    :return: An array of ros/geometry_msgs/PoseStamped messages
+    
+    Generates a trajectory the vehicle to follow (sigamoid based)
+    """  
+    
+    #Ref signal frequency
+    frequency         = 100 #[Hz]
+    #Use current position [x,y] constant and current z as lower asymptote of sigamoid
+    x_init  = currentPose.position.x
+    y_init  = currentPose.position.y
+    z_init  = currentPose.position.z
+    x_final = TargetPose.position.x
+    y_final = TargetPose.position.y
+    z_final = TargetPose.position.z
+     
+    quat    = Quaternion(0.0, 0.0, 0.0, 1.0)
+    v_max   = abs(z_final-z_init)/2.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
+    delay   = math.log((abs(z_init-z_final)/tolerance) - 1)/v_max
+    #Loop to populate trajectory with StampedPoses instances
+    trajectory = [] # z = z_init + (z_final - z_init)./(1+exp(-v_max*(t-delay-tNOW))));    
+    TrajectoryStartTime = rospy.Time()
+    print ("\nGenereting an altitude profile from z =  {} [m] -->> z = {} [m]".format(z_init , z_final))
+    i=0
+    while True: #no more than 10 sec
+        StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
+        StampedPose.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
+        t                           = TrajectoryStartTime + rospy.Duration(float(i)/frequency)        #create a time instance
+        den                         = (1+math.exp(-v_max*(t.to_sec()-delay)))        
+        x                           = x_init + (x_final - x_init)/den    #compute its height
+        y                           = y_init + (y_final - y_init)/den
+        z                           = z_init + (z_final - z_init)/den
+        #print("Test traj : At time {} z value is {}".format(t.to_sec(),z))
+        #Populate the StampedPose object
+        StampedPose.header.stamp    = t
+        StampedPose.pose            = Pose(Point(x, y, z),quat) #The pose
+        # Append the time staped pose to the trajectory to follow
+        trajectory.append(StampedPose)
+        i += 1
+        bool = numpy.array([abs(x-x_final),abs(y-y_final),abs(z-z_final)])<tolerance
+        #print bool
+        if bool.all():
+            print ("Trajectory length is {}".format(i))            
             break
-    #print ("\nTrajectory start is: {}".format(trajectory[0]))
-    #print ("\nTrajectory end is: {}".format(trajectory[-1]))
+##        elif i>10*frequency:
+##            print ("Trajectory is more than 10 seconds long, truncated now! ")
+##            break
+    print ("\nTrajectory start is: {}".format(trajectory[0].pose.position))
+    print ("\nTrajectory end is: {}".format(trajectory[-1].pose.position))
     return trajectory

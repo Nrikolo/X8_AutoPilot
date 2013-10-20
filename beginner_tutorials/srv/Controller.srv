@@ -8,7 +8,7 @@ geometry_msgs/PoseStamped[] trajectory
 bool input_gain_flag
 
 #An array holding PID gain values   {float = P,float = I,float = D}
-float32[] gains 
+float64[] gains 
 #http://answers.ros.org/question/9471/how-to-recieve-an-array-over-publisher-and-subscriber-python/
 ------
 #A boolean [0,1] = [success, failure] of turning the controller on

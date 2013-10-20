@@ -44,13 +44,12 @@ class ListenerClass():
         self.subscriber_pose           = rospy.Subscriber(poseStamped_topic,
                                                           PoseStamped,
                                                           self.poseStamped_callback)       
-        
         #Initialize the data loggers for the listener 
         self.batteryVoltage     = float
         self.poseStampedQueue   = collections.deque([],queue_size)
-        self.ctrlThrottle       = float
-        self.AutoPilotSwitch    = True
-        self.MissionGoSwitch    = True
+        self.ctrlThrottle       = float #Tx throttle stick position [-1,1]
+        self.AutoPilotSwitch    = True #UI for menifold designation
+        self.MissionGoSwitch    = True #UI for mission persistence (Different from FSM 'OUTBOUND'/'INBOUND' )
         self.runningStatPose    = [DataMagazineClass('x',queue_size),
                                   DataMagazineClass('y',queue_size),
                                   DataMagazineClass('z',queue_size)]
@@ -65,18 +64,20 @@ class ListenerClass():
     def RadioControl_callback(self,data):
         #rospy.loginfo(rospy.get_caller_id() + " I heard  %s  ",  data)
         # --------------------------------------------        
-        # flap  |  AutoPilotSwitch  |   MissionGoSwitch |
+        # gear  |  AutoPilotSwitch  |   MissionGoSwitch |
         # --------------------------------------------
         #  -1   |        OFF        |   OFF (Irrelevant)|
         #   0   |        ON         |   OFF             |
         #   1   |        ON         |   ON              |
         self.ctrlThrottle     = data.throttle
-        self.AutoPilotSwitch  = data.flap >= 0
-        self.MissionGoSwitch  = data.flap == 1
+        self.AutoPilotSwitch  = data.gear >= 0
+        self.MissionGoSwitch  = data.gear == 1
+##        print "self.AutoPilotSwitch : ", self.AutoPilotSwitch           
+##        print "self.MissionGoSwitch : ", self.MissionGoSwitch  
         
         
     def battery_callback(self,data):
-        #rospy.loginfo(rospy.get_caller_id() + " I heard  %s  ",  data.data)
+        #rospy.loginfo(rospy.get_caller_id() + " I heard  %s  ",  data.voltage)
         self.batteryVoltage  = data.voltage
         
     def poseStamped_callback(self,data):
@@ -95,7 +96,18 @@ class ListenerClass():
         self.runningStatError[self.dictionary['z']].push(abs(data.error.z))
         
         #Derivative of Error  , e.g. :(d/dt)(z_ref-z) or (velocity_des-velocity)
-        self.runningStatError_d[self.dictionary['x']].push(data.error_d.x)
-        self.runningStatError_d[self.dictionary['y']].push(data.error_d.y)
-        self.runningStatError_d[self.dictionary['z']].push(data.error_d.z)
+        self.runningStatError_d[self.dictionary['x']].push(data.derivative.x)
+        self.runningStatError_d[self.dictionary['y']].push(data.derivative.y)
+        self.runningStatError_d[self.dictionary['z']].push(data.derivative.z)
     
+    
+    
+"""
+Massages that the FSM publishes to indicate the introspection server of it's status
+    /FSM/smach/container_status
+    /FSM/smach/container_structure
+If we subscribe to /FSM/smach/container_status and assign is to msg_in.path is a string
+Use find  !
+
+
+"""

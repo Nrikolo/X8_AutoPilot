@@ -8,7 +8,7 @@ import geometry_msgs.msg
 import std_msgs.msg
 
 class ControllerRequest(genpy.Message):
-  _md5sum = "bec47316a1a048c0ac871031fab8c42d"
+  _md5sum = "e8fac3cf532440bf2190e7dd1452ef4b"
   _type = "beginner_tutorials/ControllerRequest"
   _has_header = False #flag to mark the presence of a Header object
   _full_text = """
@@ -21,7 +21,7 @@ geometry_msgs/PoseStamped[] trajectory
 bool input_gain_flag
 
 
-float32[] gains
+float64[] gains
 
 
 ================================================================================
@@ -72,7 +72,7 @@ float64 w
 
 """
   __slots__ = ['ON_OFF','trajectory','input_gain_flag','gains']
-  _slot_types = ['bool','geometry_msgs/PoseStamped[]','bool','float32[]']
+  _slot_types = ['bool','geometry_msgs/PoseStamped[]','bool','float64[]']
 
   def __init__(self, *args, **kwds):
     """
@@ -142,7 +142,7 @@ float64 w
       buff.write(_struct_B.pack(self.input_gain_flag))
       length = len(self.gains)
       buff.write(_struct_I.pack(length))
-      pattern = '<%sf'%length
+      pattern = '<%sd'%length
       buff.write(struct.pack(pattern, *self.gains))
     except struct.error as se: self._check_types(se)
     except TypeError as te: self._check_types(te)
@@ -203,7 +203,7 @@ float64 w
       start = end
       end += 4
       (length,) = _struct_I.unpack(str[start:end])
-      pattern = '<%sf'%length
+      pattern = '<%sd'%length
       start = end
       end += struct.calcsize(pattern)
       self.gains = struct.unpack(pattern, str[start:end])
@@ -244,7 +244,7 @@ float64 w
       buff.write(_struct_B.pack(self.input_gain_flag))
       length = len(self.gains)
       buff.write(_struct_I.pack(length))
-      pattern = '<%sf'%length
+      pattern = '<%sd'%length
       buff.write(self.gains.tostring())
     except struct.error as se: self._check_types(se)
     except TypeError as te: self._check_types(te)
@@ -306,10 +306,10 @@ float64 w
       start = end
       end += 4
       (length,) = _struct_I.unpack(str[start:end])
-      pattern = '<%sf'%length
+      pattern = '<%sd'%length
       start = end
       end += struct.calcsize(pattern)
-      self.gains = numpy.frombuffer(str[start:end], dtype=numpy.float32, count=length)
+      self.gains = numpy.frombuffer(str[start:end], dtype=numpy.float64, count=length)
       return self
     except struct.error as e:
       raise genpy.DeserializationError(e) #most likely buffer underfill
@@ -423,6 +423,6 @@ _struct_I = genpy.struct_I
 _struct_B = struct.Struct("<B")
 class Controller(object):
   _type          = 'beginner_tutorials/Controller'
-  _md5sum = 'a5ffca466c465e3169779fb258d22f1d'
+  _md5sum = 'c479779dae5433d054964715e7667edf'
   _request_class  = ControllerRequest
   _response_class = ControllerResponse

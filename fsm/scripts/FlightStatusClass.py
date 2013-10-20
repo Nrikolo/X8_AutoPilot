@@ -27,39 +27,96 @@ class FlightStatusClass():
     def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
         print("Initializing Flight Status Object!")
         # For Dox on the following see calling function, Main_AutoPilot.py
-        self.listener               = ListenerClass(queue_size,dictionary)
-        self.minimalBatteryVoltage  = MinBattVol
-        self.groundLevel            = groundlev
-        self.safeAltitude           = safeAltitude
-        self.missionStartTime       = rospy.Time.now().to_sec()
-        self.missionMaxTime         = MaxTime
-        self.throttleThreshold      = throttleThreshold
-        self.homeCoordinates        = home 
-        self.sleepTime              = FSM_refreshRate 
-        self.tolerance              = tolerance 
-                
+        self.listener                = ListenerClass(queue_size,dictionary)
+        self._minimalBatteryVoltage  = MinBattVol
+        self._groundLevel            = groundlev
+        self._safeAltitude           = safeAltitude
+        self._throttleThreshold      = throttleThreshold
+        self._missionStartTime       = rospy.Time.now().to_sec()
+        self._missionMaxTime         = MaxTime        
+        self.tolerance               = tolerance 
+        self.sleepTime               = FSM_refreshRate 
+        self.setTargetPose() 
+        self.setHomePose(home.position, home.orientation)
+            
         # self.mission_stage : self indicating autonomous version of MissionGoSwitch. 
-        # FSM starts with OUTBOUND but determines and alters the stage on its own based on events
+        # FSM starts with OUTBOUND but determines the status autonomously , based on events.
         # OUTBOUND means vehicle should proceed forward in mission. 
-        # INBOUND means it should revert backwards TrajFollow->GoHome->Hover->Land->Idle->Turns Motors Off        
+        # INBOUND means it should revert backwards TrajFollow->GoHome->Hover->Land->Idle->Turns Motors Off 
+        # Once INBOUND, behavious is identical the event : MissionGoSwitch=False       
         self.mission_stage          = 'OUTBOUND' 
-        
 
-    def getMode(self):
+    def getMinimalBatteryVoltage(self):
         """
-        :return: void
+        :return: Minimal Allowed Battery Voltage
         
-        Accesor function to publish whether FSM is in Autonomous or Manual MManifold
+        Accesor function 
         """
-        pass
+        return self._minimalBatteryVoltage
+    
+    def getGroundLevel(self):
+        """
+        :return: Ground level in meters in world frame
         
-    def getCurrentBatteryVoltage(self):
+        Accesor function 
         """
-        :return: Current (latest) Stamped Pose msg type
+        return self._groundLevel
+
+    def getSafeAltitude(self):
+        """
+        :return: Flight Status Safe Altitude
+        
+        Accesor function 
+        """
+        return self._safeAltitude
+
+    def getThrottleThreshold(self):
+        """
+        :return: Tx Throttle threshold for considering human pilot intention
         
         Accesor Function 
         """        
-        return self.listener.self.batteryVoltage
+        return self._throttleThreshold
+    
+    def getMissionStartTime(self):
+        """
+        :return: ROS time object designating when the mission has started
+        
+        Accesor Function 
+        """        
+        return self._missionStartTime
+    
+    def getMissionMaxTime(self):
+        """
+        :return: ROS time object designating maximal allowed mission duration
+        
+        Accesor Function 
+        """        
+        return self._missionMaxTime
+    
+    def getHomePose(self):
+        """
+        :return: ROS msg of type "geometry_msgs\Pose.msg" designating the [x,y,z] corrdinates of HOME and an arbitrary quaternion
+        
+        Accesor Function 
+        """        
+        return self._homePose
+
+    def getCurrentThrottle(self):
+        """
+        :return: current Tx throttle level
+        
+        Accesor Function 
+        """        
+        return self.listener.ctrlThrottle
+     
+    def getCurrentBatteryVoltage(self):
+        """
+        :return: current battery voltage
+        
+        Accesor Function 
+        """        
+        return self.listener.batteryVoltage
     
     def getCurrentPoseStamped(self):
         """
@@ -70,6 +127,14 @@ class FlightStatusClass():
         #print self.listener.poseStampedQueue    
         return self.listener.poseStampedQueue[-1]    
     
+    def getCurrentPose(self):
+        """
+        :return: Current (latest) Stamped Pose msg type
+        
+        Accesor Function 
+        """        
+        return self.getCurrentPoseStamped().pose
+    
     def getCurrentState(self,str_state):
         """
         :param: str_state: string of the state to be returned , either 'x','y','z'
@@ -77,7 +142,7 @@ class FlightStatusClass():
         
         Accesor Function 
         """
-        return getattr(self.getCurrentPoseStamped().pose.position,str_state)    
+        return getattr(self.getCurrentPose().position,str_state)    
     
     def getCurrentAltitude(self):
         """
@@ -93,7 +158,41 @@ class FlightStatusClass():
         
         Accesor Function for mission duration thus far [seconds]
         """
-        return rospy.Time.now().to_sec()-self.missionStartTime
+        return rospy.Time.now().to_sec()-self.getMissionStartTime()
+    
+    def getTargetPose(self):
+        """
+        :return: pose
+        
+        Accesor Function to get the current target pose of the vehicle (to where the controller is aiming to drive)
+        """
+        return self._targetPose 
+        
+    def setTargetPose(self,position = Point(0.0,0.0,1.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
+        """
+        :return: void
+        
+        Accesor Function to set the current target pose of the vehicle (to where the controller is aiming to drive)
+        """
+        self._targetPose = Pose(position,orientation)
+        return 
+    
+    def setHomePose(self,position = Point(0.0,0.0,1.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
+        """
+        :return: void
+        
+        Accesor Function to set the current target pose of the vehicle (to where the controller is aiming to drive)
+        """
+        self._homePose = Pose(position,orientation)
+        return 
+    
+    def IsThrottleUp(self):
+        """
+        :return: A boolean indicating whether TX throttle level is above threshold
+        
+        Function indicating whether TX throttle level is above threshold
+        """
+        return self.listener.ctrlThrottle>self._throttleThreshold    
     
     def IsTimeExceeded(self):
         """
@@ -101,8 +200,16 @@ class FlightStatusClass():
         
         Function indicated whether alloted time for mission has be exceeded
         """
-        return self.getMissionDuration()>self.missionMaxTime
+        return self.getMissionDuration()>self.getMissionMaxTime()
         
+    def IsHome(self):
+        """
+        :return: A boolean indicating whether vehicle is within a predefined threshold of the distance home
+        
+        Function indicates if vehicle is in home coordinates
+        """
+        return self.DistanceToHome()<self.tolerance
+    
     def ErrorConverge(self,str_attribute):
         """
         :param: str_attribute: string of the state to be returned , either 'x','y','z'
@@ -110,13 +217,24 @@ class FlightStatusClass():
         
         Utility function to determine if error of controller has converged
         """        
+        #Distance to Target Pose
+        #print "Check if Error has converged: " 
+        #print "\nStart pose: " ,      self.getCurrentPoseStamped().pose
+        #print "\nTarget pose: " ,      self.getTargetPose()
+       
+        
+        #Controller Errors
         e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
+        print "\nError Mean" , e_mean
+        print "Error Derivative Mean" , e_d_mean
         
-        bool_error   =  abs(e_mean) < 0.1       
-        bool_error_d =  abs(e_d_mean-0.1)  < 0.1       
+        print "\nError Var" , e_var
+        print "Error Derivative Var" , e_d_var
 
-        if bool_error and bool_error_d :
+        bool_error   =  abs(e_mean) < 0.05 and e_var< 0.01       
+        bool_error_d =  abs(e_d_mean)  < 0.01 and e_d_var< 0.01
+        if bool_error and bool_error_d:
             print "Error in " ,str_attribute ,"Converged"
             return True
         else :
@@ -131,10 +249,19 @@ class FlightStatusClass():
         
         :return: A boolean indicating whether position error has converged and velocity is ~zero (vehicle is hovering)
         """
-        bool = True 
-        for str in 'xyz':
-            bool *= self.ErrorConverge(str)
-        return bool
+        distance_to_target = Distance('Euclidean',
+                                        PoseMsg2NumpyArrayPosition( self.getCurrentPose() ),
+                                        PoseMsg2NumpyArrayPosition( self.getTargetPose()              ),
+                                        3)
+        print "\nDistance to TARGET: " , distance_to_target
+        
+        bool    = abs(distance_to_target)< self.tolerance #Close to target
+        if not bool:
+            return False
+        else:
+            for str in 'xyz':
+                bool *= self.ErrorConverge(str)
+            return bool
     
     def ErrorDiverge(self,str_attribute):
         """
@@ -146,7 +273,7 @@ class FlightStatusClass():
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
         #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
         #print "e_d_mean", e_d_mean
-        bool_error_d = abs(e_d_mean)  > 0.1       
+        bool_error_d = abs(e_d_mean)  > 1       
         if bool_error_d :
             print "Error derivative in " ,str_attribute ,"Diverged"            
             return True
@@ -167,7 +294,18 @@ class FlightStatusClass():
             bool *= not self.ErrorDiverge(str)
         return bool
 
+    def DistanceToHome(self):
+        """
+        :return: A float representing the 2D (x-y planar) Euclidean distance of the vehicle from home
+    
+        """        
+        dist = Distance('Euclidean',
+                        PoseMsg2NumpyArrayPosition(self.getCurrentPose() ),
+                        PoseMsg2NumpyArrayPosition(self.getHomePose()    ),
+                        2)
+        return dist
 
+    
     def VoltageNeededToGetHome(self):
         """
         :return: A float representing the estimated voltage needed to return home from present location
@@ -176,13 +314,10 @@ class FlightStatusClass():
         Can be later implemented as a table lookup [Euclidean Dist, Voltage] or an energy mapping of a trajectory generated by a motion planner called
         """        
         #Presently implements an arbitrary scaling from distance to voltage 
-        CurrentStampedPose = self.getCurrentPoseStamped()
-        dist = Distance('Euclidean',
-                        PoseMsg2NumpyArrayPosition(CurrentStampedPose.pose),
-                        PointMsg2NumpyArrayPosition(self.homeCoordinates),
-                        3)        
+##        CurrentStampedPose = self.getCurrentPoseStamped()
+        dist = self.DistanceToHome()       
         #print("Vehicle is a distance of %s meters away from home " % dist)
-        return 0 
+        return dist*0.001 #<<<--- !!!
         
         
     def IsBatteryOK(self):
@@ -196,15 +331,15 @@ class FlightStatusClass():
 ##        print ('\n\nCurrent Battery Voltage' , self.listener.batteryVoltage )        
 ##        print ('Minimal Batt Voltage allowed :' , self.minimalBatteryVoltage )
 ##        print ('Battery to get HOME:' , self.VoltageNeededToGetHome() )
-        if self.listener.batteryVoltage < self.minimalBatteryVoltage + self.VoltageNeededToGetHome() : 
+        if self.getCurrentBatteryVoltage() < self.getMinimalBatteryVoltage() + self.VoltageNeededToGetHome() : 
             sys.stdout.write('\rNot Enough Battery...')            
             return False
         else :
             print ('We are good, Enough Battery')
             return True
     
-    def window(self,size):
-        return numpy.ones(size)/float(size) #Uniform weights
+##    def window(self,size):
+##        return numpy.ones(size)/float(size) #Uniform weights
     
    
 

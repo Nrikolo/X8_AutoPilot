@@ -1,0 +1,20 @@
+<launch>
+
+<!-- Start the Finite-State-Machine while remapping the topics -->
+
+<!-- node name="FSM"              pkg="fsm"                type="Main_AutoPilot.py" output = "screen" launch-prefix = "xterm -geometry 200x35+10+1000 -e"-->  
+
+<node name="FSM"              pkg="fsm"                type="Main_AutoPilot.py" output = "screen" >
+	<remap from = "battery"         to = "x8/output/battery" /> 
+    <remap from = "poseStamped"     to = "x8/output/pose" /> 
+    <remap from = "ControllerError" to = "controller/error" /> 
+    <remap from = "RadioControl"    to = "joystick_converter/radio_control" /> 
+</node>
+
+<!-- Autonomous Menifold Indicator Node -->
+ <node name="manifold_indicator"  pkg="fsm"  type="fsm_manifold_indicator.py" output = "screen"  >
+    <remap from = "topic_in"      to = "/FSM/smach/container_status" /> 
+    <remap from = "topic_out"     to = "/FSM/autonomous_mode" /> 
+</node> 
+
+</launch>

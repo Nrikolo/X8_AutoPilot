@@ -21,7 +21,8 @@ from fsm_states import *
 
 def main():
     rospy.init_node('TOP_FSM')
-
+    while rospy.Time.now().to_sec()==0:
+        rospy.sleep(0.1)
     # Create a SMACH state machine
     # The FSM has one outcome of "Done" when mission exceedes alloted time or otherwise defined in the transitions
     sm_top                                = smach.StateMachine(outcomes=['Done'])
@@ -30,16 +31,17 @@ def main():
     
     
     #Safety Parameters (there is no const in python, caferful when accesing these from within the sub_fsms)
-    safeAltitude        = 1.0
+    safeAltitude        = 2.0
     BattMinimalVoltage  = 13.8
-    groundLevel         = 0.2
+    groundLevel         = 0.308
     throttleThreshold   = 0.2
     missionMaxTime      = rospy.Duration(300).to_sec() #300 sec = 5 min
 
     #Define Static Parameters 
-    home                 = Point(0.0, 0.0, 1.0) #Default Home [x,y,z] position, msg type Point of geometry_msgs 
-    tolerance            = 0.02                 #[meters] position controller error signal convergence
-    queue_size           = 50                   #Size of history queue of pose msgs saved for convergence computation
+    home                 = Pose(Point(0.0, 0.0, 1.0),Quaternion(0.0,0.0,0.0,1.0)) #Default Home [x,y,z] position, msg type  of geometry_msgs 
+    print home
+    tolerance            = 0.01                 #[meters] position controller error signal convergence
+    queue_size           = 100                   #Size of history queue of pose msgs saved for convergence computation
     dictionary           = {'x' : 0,            #Dictionary to map PoseQueue rows to axes
                             'y' : 1,
                             'z' : 2,
@@ -49,7 +51,7 @@ def main():
                             'q0': 6}
     
     #Define Debugging Aid
-    fsm_refresh_rate     = 1.0 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
+    fsm_refresh_rate     = 0.4 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
     print "\n------------------------------------------------------------------------------------------------------------------\n"
             
     #Contruct a FlightStatusIndicator as a member of sm_top
@@ -65,7 +67,6 @@ def main():
                                             tolerance)
     #Contruct a ControlManager as a member of sm_top
     sm_top.ControlManager = ControllerManagementClass()
-        
     # Open the container
     with sm_top:
         # Add states to the container
@@ -163,7 +164,7 @@ def main():
                                                 'Failure':'Failure'})
 #----------------------------------------------------------------------------------------
     # Create the HOVER SMACH state machine
-            sm_hover = smach.StateMachine(outcomes=['ToLand','ToManual']) 
+            sm_hover = smach.StateMachine(outcomes=['ToLand','ToManual','ToHome']) 
 ##                                        input_keys=['HoverSM_mission_stage_in'],
 ##                                        output_keys=['HoverSM_mission_stage_out'])      
             with sm_hover:
@@ -178,13 +179,15 @@ def main():
                                         transitions={'MissionDone':'ToLand',
                                                     'Maintain':'HOVER_MONITOR',
                                                     'Aborted_NoBatt':'ToLand',
-                                                    'Aborted_Diverge':'ToManual'})
+                                                    'Aborted_Diverge':'ToManual',
+                                                    'GoHome':'ToHome'})
 ##                                        remapping = {'Hover_mission_stage_in':'HoverSM_mission_stage_in',
 ##                                                    'Hover_mission_stage_out':'HoverSM_mission_stage_out'})
             #Add a HOVER sub state machine to the autonomous manifold                                                            
             smach.StateMachine.add('HOVER',
                                     sm_hover, 
                                     transitions={'ToLand':'LAND',
+                                                 'ToHome':'GO_HOME',
                                                 'ToManual':'Failure'})
 ##                                    remapping = {'HoverSM_mission_stage_in':'Autonomous_mission_stage_in',
 ##                                                'HoverSM_mission_stage_out':'Autonomous_mission_stage_out'})
@@ -229,8 +232,8 @@ def main():
     sis = smach_ros.IntrospectionServer('FSM', sm_top, '/SM_TOP')
     sis.start()
     #Starting Process
-    #Wait till come data is accumulated (alternative??)
-    rospy.sleep(2.)
+    #Wait till some data is accumulated (alternative??)
+    rospy.sleep(1.)
     # Execute SMACH plan
     outcome = sm_top.execute()
     # Wait for ctrl-c to stop the application

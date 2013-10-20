@@ -12,8 +12,10 @@
   <depend package="rospy"/>
   <depend package="smach_ros"/>
   <depend package="quadrotor_msgs"/>
+  <depend package="smach_msgs"/>
   <depend package="roslib"/>
   <depend package="xdot"/>
+  <depend package="quadrotor_input"/> 
 
 </package>
 
