@@ -26,22 +26,19 @@ def main():
     # Create a SMACH state machine
     # The FSM has one outcome of "Done" when mission exceedes alloted time or otherwise defined in the transitions
     sm_top                                = smach.StateMachine(outcomes=['Done'])
-##                                                            output_keys = ['end_mission_stage'])
-##    sm_top.userdata.start_mission_stage= 'OUTBOUND' #Indicating whether mission is in outbound stage or inbound stage    
-    
-    
+   
     #Safety Parameters (there is no const in python, caferful when accesing these from within the sub_fsms)
     safeAltitude        = 2.0
     BattMinimalVoltage  = 13.8
     groundLevel         = 0.308
     throttleThreshold   = 0.2
-    missionMaxTime      = rospy.Duration(300).to_sec() #300 sec = 5 min
+    missionMaxTime      = rospy.Duration(60).to_sec() #300 sec = 5 min
 
     #Define Static Parameters 
-    home                 = Pose(Point(0.0, 0.0, 1.0),Quaternion(0.0,0.0,0.0,1.0)) #Default Home [x,y,z] position, msg type  of geometry_msgs 
-    print home
-    tolerance            = 0.01                 #[meters] position controller error signal convergence
-    queue_size           = 100                   #Size of history queue of pose msgs saved for convergence computation
+    homePose             = Pose(Point(0.0, 0.0, safeAltitude),
+                                Quaternion(0.0,0.0,0.0,1.0)) #Default Home [x,y,z] position, msg type  of geometry_msgs 
+    tolerance            = 0.1                 #[meters] proximity measure for controller convergence and target reaching
+    queue_size           = 100                  #Size of history queue of pose msgs saved for convergence computation
     dictionary           = {'x' : 0,            #Dictionary to map PoseQueue rows to axes
                             'y' : 1,
                             'z' : 2,
@@ -62,7 +59,7 @@ def main():
                                             groundLevel,
                                             throttleThreshold,
                                             missionMaxTime,
-                                            home,
+                                            homePose,
                                             fsm_refresh_rate,
                                             tolerance)
     #Contruct a ControlManager as a member of sm_top
@@ -176,8 +173,7 @@ def main():
                 # Create and add the HOVER_MONITOR SMACH state into the HOVER sub state machine
                 smach.StateMachine.add('HOVER_MONITOR',
                                         HOVER(sm_top.FlightStatus),
-                                        transitions={'MissionDone':'ToLand',
-                                                    'Maintain':'HOVER_MONITOR',
+                                        transitions={'Maintain':'HOVER_MONITOR',
                                                     'Aborted_NoBatt':'ToLand',
                                                     'Aborted_Diverge':'ToManual',
                                                     'GoHome':'ToHome'})
@@ -207,7 +203,6 @@ def main():
                                         FOLLOW_TRAJECTORY(sm_top.FlightStatus),
                                         transitions={'Arrived':'ToHover',
                                                     'Maintain':'GO_HOME_MONITOR',
-                                                    'Aborted_NoBatt':'ToManual',
                                                     'Aborted_Diverge':'ToManual'})
 ##                                         remapping = {'TrajFol_mission_stage_in':'GoHomeSM_mission_stage_in',
 ##                                                      'TrajFol_mission_stage_out':'GoHomeSM_mission_stage_out'})

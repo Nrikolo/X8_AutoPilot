@@ -9,6 +9,7 @@ PKG = 'fsm' # this package name
 import roslib; roslib.load_manifest(PKG)
 import rospy
 import numpy
+import math
 from rospy.numpy_msg import numpy_msg
 from Utility import *
 import sys
@@ -39,13 +40,6 @@ class FlightStatusClass():
         self.setTargetPose() 
         self.setHomePose(home.position, home.orientation)
             
-        # self.mission_stage : self indicating autonomous version of MissionGoSwitch. 
-        # FSM starts with OUTBOUND but determines the status autonomously , based on events.
-        # OUTBOUND means vehicle should proceed forward in mission. 
-        # INBOUND means it should revert backwards TrajFollow->GoHome->Hover->Land->Idle->Turns Motors Off 
-        # Once INBOUND, behavious is identical the event : MissionGoSwitch=False       
-        self.mission_stage          = 'OUTBOUND' 
-
     def getMinimalBatteryVoltage(self):
         """
         :return: Minimal Allowed Battery Voltage
@@ -168,7 +162,7 @@ class FlightStatusClass():
         """
         return self._targetPose 
         
-    def setTargetPose(self,position = Point(0.0,0.0,1.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
+    def setTargetPose(self,position = Point(0.0,0.0,2.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
         """
         :return: void
         
@@ -177,7 +171,15 @@ class FlightStatusClass():
         self._targetPose = Pose(position,orientation)
         return 
     
-    def setHomePose(self,position = Point(0.0,0.0,1.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
+    def getHomePose(self):
+        """
+        :return: pose
+        
+        Accesor Function to get the current home pose of the vehicle 
+        """
+        return self._homePose 
+    
+    def setHomePose(self,position = Point(0.0,0.0,2.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
         """
         :return: void
         
@@ -226,23 +228,21 @@ class FlightStatusClass():
         #Controller Errors
         e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
-        print "\nError Mean" , e_mean
-        print "Error Derivative Mean" , e_d_mean
-        
-        print "\nError Var" , e_var
+        print "\nError Mean", e_mean
+        print "Error Var", e_var       
+     
+        print "\nError Derivative Mean", e_d_mean
         print "Error Derivative Var" , e_d_var
 
-        bool_error   =  abs(e_mean) < 0.05 and e_var< 0.01       
-        bool_error_d =  abs(e_d_mean)  < 0.01 and e_d_var< 0.01
+        bool_error   =  abs(e_mean) < self.tolerance and e_var< math.pow(self.tolerance,2)
+        bool_error_d =  abs(e_d_mean)  < self.tolerance and e_d_var< math.pow(self.tolerance,2)
         if bool_error and bool_error_d:
-            print "Error in " ,str_attribute ,"Converged"
+            print "\nError in " ,str_attribute ,"Converged"
             return True
         else :
-            print "Error in " ,str_attribute ,"Did not Converge"
+            print "\nError in " ,str_attribute ,"Did not Converge"
             return False
     
-    #Nir - 2013-10-03 : The following function should be changed! would falsly indicate convergence when trajectory tracking is very good. 
-    #Can be solved by splitting the control activation and ref layer from the FSM
     def PositionErrorConverge(self):
         """
         :param: void
@@ -250,9 +250,9 @@ class FlightStatusClass():
         :return: A boolean indicating whether position error has converged and velocity is ~zero (vehicle is hovering)
         """
         distance_to_target = Distance('Euclidean',
-                                        PoseMsg2NumpyArrayPosition( self.getCurrentPose() ),
-                                        PoseMsg2NumpyArrayPosition( self.getTargetPose()              ),
-                                        3)
+                                      PoseMsg2NumpyArrayPosition( self.getCurrentPose() ),
+                                      PoseMsg2NumpyArrayPosition( self.getTargetPose()  ),
+                                      3)
         print "\nDistance to TARGET: " , distance_to_target
         
         bool    = abs(distance_to_target)< self.tolerance #Close to target
@@ -262,7 +262,7 @@ class FlightStatusClass():
             for str in 'xyz':
                 bool *= self.ErrorConverge(str)
             return bool
-    
+
     def ErrorDiverge(self,str_attribute):
         """
         :param: str_attribute: string of the state to be returned , either 'x','y','z'
@@ -273,7 +273,7 @@ class FlightStatusClass():
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
         #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
         #print "e_d_mean", e_d_mean
-        bool_error_d = abs(e_d_mean)  > 1       
+        bool_error_d = abs(e_d_mean)  > 10*self.tolerance       
         if bool_error_d :
             print "Error derivative in " ,str_attribute ,"Diverged"            
             return True
@@ -281,7 +281,6 @@ class FlightStatusClass():
         else :
 ##            print "Error derivative in " ,str_attribute ,"Did not Diverge"            
             return False
-
 
     def PositionErrorDiverge(self):
         """

@@ -160,16 +160,16 @@ def getTrajectoryAltitudeProfile(currentPoseStamped, TargetPose, tolerance):
     z_final = TargetPose.position.z
     quat    = Quaternion(0.0, 0.0, 0.0, 1.0)
     v_max   = abs(z_final-z_init)/2.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
+    print (abs(z_init-z_final)/tolerance) - 1    
     delay   = math.log((abs(z_init-z_final)/tolerance) - 1)/v_max
     #Loop to populate trajectory with StampedPoses instances
     trajectory = [] # z = z_init + (z_final - z_init)./(1+exp(-v_max*(t-delay-tNOW))));    
-    TrajectoryStartTime = rospy.Time()
     print ("\nGenereting an altitude profile from z =  {} [m] -->> z = {} [m]".format(z_init , z_final))
     i=0
     while True: #no more than 10 sec
         StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
         StampedPose.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
-        t                           = TrajectoryStartTime + rospy.Duration(float(i)/frequency)        #create a time instance
+        t                           = rospy.Duration(float(i)/frequency)        #create a time instance
         z                           = z_init + (z_final - z_init)/(1+math.exp(-v_max*(t.to_sec()-delay)));    #compute its height
         #print("Test traj : At time {} z value is {}".format(t.to_sec(),z))
         #Populate the StampedPose object
@@ -198,7 +198,22 @@ def getTrajectory(currentPose, TargetPose, tolerance):
     
     Generates a trajectory the vehicle to follow (sigamoid based)
     """  
-    
+    trajectory = []
+      
+    distance_to_target = Distance('Euclidean',
+                                   PoseMsg2NumpyArrayPosition( currentPose ),
+                                   PoseMsg2NumpyArrayPosition( TargetPose ),
+                                   3)    
+    print "Euclidean Distance to Target: " , distance_to_target 
+    if distance_to_target < tolerance :
+        print "Basically at target already"
+        StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
+        StampedPose.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
+        StampedPose.header.stamp    = rospy.Time.now()
+        StampedPose.pose            = currentPose #The pose
+        trajectory.append(StampedPose)
+        return trajectory
+
     #Ref signal frequency
     frequency         = 100 #[Hz]
     #Use current position [x,y] constant and current z as lower asymptote of sigamoid
@@ -210,22 +225,26 @@ def getTrajectory(currentPose, TargetPose, tolerance):
     z_final = TargetPose.position.z
      
     quat    = Quaternion(0.0, 0.0, 0.0, 1.0)
-    v_max   = abs(z_final-z_init)/2.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
-    delay   = math.log((abs(z_init-z_final)/tolerance) - 1)/v_max
+    delta   = numpy.amax([abs(z_final-z_init),abs(z_final-z_init),abs(z_final-z_init)])
+    if delta<tolerance:
+        v_max   = 1.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
+        delay   = 0.0
+    else:
+        v_max   = delta/1.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
+        delay   = math.log(delta/tolerance - 1)/v_max
+        
     #Loop to populate trajectory with StampedPoses instances
-    trajectory = [] # z = z_init + (z_final - z_init)./(1+exp(-v_max*(t-delay-tNOW))));    
-    TrajectoryStartTime = rospy.Time()
-    print ("\nGenereting an altitude profile from z =  {} [m] -->> z = {} [m]".format(z_init , z_final))
+    #print ("\nGenereting a trajectory from z =  {} [m] -->> z = {} [m]".format(z_init , z_final))
     i=0
-    while True: #no more than 10 sec
+    while True: 
         StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
         StampedPose.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
-        t                           = TrajectoryStartTime + rospy.Duration(float(i)/frequency)        #create a time instance
-        den                         = (1+math.exp(-v_max*(t.to_sec()-delay)))        
+        t                           = rospy.Duration(float(i)/frequency)        #create a time instance
+        den                         = (1+math.exp(-v_max*(t.to_sec()-delay)))  
         x                           = x_init + (x_final - x_init)/den    #compute its height
         y                           = y_init + (y_final - y_init)/den
         z                           = z_init + (z_final - z_init)/den
-        #print("Test traj : At time {} z value is {}".format(t.to_sec(),z))
+##        print("Test traj : At time {} x value is {}".format(t.to_sec(),x))
         #Populate the StampedPose object
         StampedPose.header.stamp    = t
         StampedPose.pose            = Pose(Point(x, y, z),quat) #The pose
