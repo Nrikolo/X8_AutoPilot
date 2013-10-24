@@ -167,7 +167,7 @@ def getTrajectoryAltitudeProfile(currentPoseStamped, TargetPose, tolerance):
     print ("\nTrajectory end is: {}".format(trajectory[-1].pose.position))
     return trajectory
 
-def getTrajectory(currentPose, TargetPose, tolerance): 
+def getTrajectory(currentPose, TargetPose , tolerance = 0.01): 
     #Function should be formulated as a motion planner wrapped as a service
     """
     :param currentPoseStamped: A ros/geometry_msgs/PoseStamped message

@@ -11,6 +11,7 @@ import numpy
 import math
 from rospy.numpy_msg import numpy_msg
 from Utility import *
+import copy
 import sys
 import time
 import random
@@ -120,7 +121,7 @@ class FlightStatusClass():
         Accesor Function 
         """        
         #print self.listener.poseStampedQueue    
-        return self.listener.poseStampedQueue[-1]    
+        return copy.deepcopy(self.listener.poseStampedQueue[-1])
     
     def getCurrentPose(self):
         """
@@ -128,7 +129,7 @@ class FlightStatusClass():
         
         Accesor Function 
         """        
-        return self.getCurrentPoseStamped().pose
+        return copy.deepcopy(self.getCurrentPoseStamped().pose)
     
     def getCurrentState(self,str_state):
         """
@@ -137,7 +138,7 @@ class FlightStatusClass():
         
         Accesor Function 
         """
-        return getattr(self.getCurrentPose().position,str_state)    
+        return copy.deepcopy(getattr(self.getCurrentPose().position,str_state)   )
     
     def getCurrentAltitude(self):
         """
@@ -161,7 +162,7 @@ class FlightStatusClass():
         
         Accesor Function to get the current target pose of the vehicle (to where the controller is aiming to drive)
         """
-        return self._targetPose 
+        return copy.deepcopy(self._targetPose)
         
     def setTargetPose(self,position = Point(0.0,0.0,2.0) ,orientation = Quaternion(0.0,0.0,0.0,1.0) ):
         """
@@ -169,9 +170,10 @@ class FlightStatusClass():
         
         Accesor Function to set the current target pose of the vehicle (to where the controller is aiming to drive)
         """
+        
         #Ensure the target pose altitude is above safeAltitude
         position.z = position.z if position.z > self.getSafeAltitude() else self.getSafeAltitude()
-        self._targetPose = Pose(position,orientation)
+        self._targetPose = Pose(copy.copy(position),copy.copy(orientation))
         return 
     
     def getHomePose(self):
@@ -188,7 +190,7 @@ class FlightStatusClass():
         
         Accesor Function to set the current target pose of the vehicle (to where the controller is aiming to drive)
         """
-        self._homePose = Pose(position,orientation)
+        self._homePose = Pose(copy.deepcopy(position),copy.deepcopy(orientation))
         return 
     
     def IsThrottleUp(self):

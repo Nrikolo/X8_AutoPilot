@@ -234,6 +234,9 @@ class CONTROLLER_INIT(smach.State):
         #Service_in.gains = [1.0,2.0,3.0] 
         # Default  - Controller should turn ON
         Service_in.running = True
+        print "self.flightStatus.getCurrentPose():", self.flightStatus.getCurrentPose()
+        
+        
         if self.str_ParentStateName is 'IDLE':
 ##            print "SwitchCase IDLE"
             if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK():
@@ -242,9 +245,10 @@ class CONTROLLER_INIT(smach.State):
                 Service_in.running = False
             else:
                 print("Getting ready to start mission...")
-                print ("Creating a StampedPose to be used as a constant ref signal for the controller")
-          
-            self.flightStatus.setTargetPose(self.flightStatus.getCurrentPose().position)
+                print ("Creating a TargetPose to be used as a constant ref signal for the controller")
+                self.flightStatus.setTargetPose(self.flightStatus.getCurrentPose().position)
+                self.flightStatus._targetPose.position.z = self.flightStatus.getCurrentAltitude()
+            
         else:
             for case in switch(self.str_ParentStateName):
                                
@@ -276,9 +280,9 @@ class CONTROLLER_INIT(smach.State):
 ##                    print 'GO_HOME'
                     break
         
-##        print "Prior to generating a trajectory"
-##        print "Current:" , self.flightStatus.getCurrentPose()
-##        print "Target:", self.flightStatus.getTargetPose()
+        print "Prior to generating a trajectory"
+        print "Current:" , self.flightStatus.getCurrentPose()
+        print "Target:", self.flightStatus.getTargetPose()
         # Call a function that generates a trajectory for the controller to follow - - >>>> SHOULD BE A SERVICE PROVIDOR            
         Service_in.path.poses = getTrajectory(self.flightStatus.getCurrentPose(),
                                               self.flightStatus.getTargetPose(),
