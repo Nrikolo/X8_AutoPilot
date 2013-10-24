@@ -48,7 +48,7 @@ def main():
                             'q0': 6}
     
     #Define Debugging Aid
-    fsm_refresh_rate     = 0.4 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
+    fsm_refresh_rate     = 1.0 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
     print "\n------------------------------------------------------------------------------------------------------------------\n"
             
     #Contruct a FlightStatusIndicator as a member of sm_top
@@ -200,7 +200,7 @@ def main():
                                                     'Failure':'ToManual'})
                 # Create and add the HOVER_MONITOR SMACH state into the HOVER sub state machine
                 smach.StateMachine.add('GO_HOME_MONITOR',
-                                        FOLLOW_TRAJECTORY(sm_top.FlightStatus),
+                                        FOLLOW_TRAJECTORY(sm_top.FlightStatus,'GO_HOME'),
                                         transitions={'Arrived':'ToHover',
                                                     'Maintain':'GO_HOME_MONITOR',
                                                     'Aborted_Diverge':'ToManual'})

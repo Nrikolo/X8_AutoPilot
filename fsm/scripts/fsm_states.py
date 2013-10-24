@@ -165,7 +165,7 @@ class IDLE(smach.State):
      def execute(self, userdata):
         rospy.loginfo('Executing state IDLE')
         rospy.sleep(self.flightStatus.sleepTime)
-        if self.flightStatus.listener.AutoPilotSwitch == False or  not self.flightStatus.IsBatteryOK() :
+        if self.flightStatus.listener.AutoPilotSwitch == False or  not self.flightStatus.IsBatteryOK():
             print ('All Controllers turned off - we are DONE') 
             #Waited for a while in idle or one of the switches is OFF
             print ("AutoPilot is OFF  --->>> goto MANUAL") 
@@ -179,31 +179,36 @@ class IDLE(smach.State):
 
 # define state FOLLOWTRAJECTORY  (This state should be is a template for GoHome or any other follow traj, the only difference is what is the trajectory to follow)
 class FOLLOW_TRAJECTORY(smach.State):
-     def __init__(self,flightStatus):
+     def __init__(self,flightStatus,str_ParentStateName):
         smach.State.__init__(self, outcomes=['Arrived',
                                             'Aborted_Diverge',
                                             'Maintain'])
 ##                                   input_keys  = ['TrajFol_mission_stage_in'],
 ##                                    output_keys = ['TrajFol_mission_stage_out'])
         self.flightStatus = flightStatus
+        self.str_ParentStateName = str_ParentStateName
                 
      def execute(self, userdata):
-        rospy.loginfo('Executing state FOLLOW_TRAJECTORY')
+        rospy.loginfo('Executing state FOLLOW_TRAJECTORY inside %s', self.str_ParentStateName )
         rospy.sleep(self.flightStatus.sleepTime)
         #Should add that is in follow trajectory and target pose is homepose, then maintain...
-        if self.flightStatus.PositionErrorDiverge() or self.flightStatus.listener.AutoPilotSwitch==False:
-            print ("Either pilot wants control back or vehicle is unstable - goto MANUAL")                 
-            return 'Aborted_Diverge' #->Manual!
-        if not self.flightStatus.IsBatteryOK() :
-            print ("there is no Batt - goto LAND")#Later should be mapped to GOHOME state
-            return 'Arrived' #->Vehicle should LAND
-        if self.flightStatus.IsTimeExceeded(): 
-            print ("Mission Duration Exceeded - Finish") 
-            if not Distance('Euclidean',PoseMsg2NumpyArrayPosition( self.flightStatus.getHomePose() ),PoseMsg2NumpyArrayPosition( self.flightStatus.getTargetPose()  ),3) <self.flightStatus.tolerance:
-                return 'Arrived' #-->> To hover - would then return home            
-        if self.flightStatus.PositionErrorConverge():
-            print ("Seems like I have arrived at destination --->>> goto HOVER") 
+        if self.flightStatus.PositionErrorDiverge() or self.flightStatus.listener.AutoPilotSwitch == False:
+            print ("Either pilot wants control back or vehicle is unstable --->>> goto MANUAL")                 
+            return 'Aborted_Diverge' #--->>>Manual!
+                
+        if self.flightStatus.PositionErrorConverge() : #Regardless of parent container, if arrived at destination, should goto HOVER
+            print ("Seems like vehicle arrived at destination --->>> goto HOVER") 
             return 'Arrived'
+
+        if self.str_ParentStateName is 'GO_HOME' :    
+                if self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK() or self.flightStatus.IsTimeExceeded() :         
+                    print ("Vehicle returning home...")
+                    return 'Maintain' #->Vehicle should continue going home
+                else:
+                    print ("Should return to mission execution --->>> goto HOVER") 
+                    return 'Arrived'
+                        
+        #Distance('Euclidean',PoseMsg2NumpyArrayPosition( self.flightStatus.getHomePose() ),PoseMsg2NumpyArrayPosition( self.flightStatus.getTargetPose()  ),3) <self.flightStatus.tolerance:
         print("Following Trajectory")
         return 'Maintain'
             
@@ -230,7 +235,7 @@ class CONTROLLER_INIT(smach.State):
         # Default  - Controller should turn ON
         Service_in.running = True
         if self.str_ParentStateName is 'IDLE':
-            print "SwitchCase IDLE"
+##            print "SwitchCase IDLE"
             if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK():
                 print ('All Controllers should be turned off...') 
                 # Designated that the controller should turn OFF
@@ -244,73 +249,44 @@ class CONTROLLER_INIT(smach.State):
             for case in switch(self.str_ParentStateName):
                                
                 if case('HOVER'):
-                    print "SwitchCase HOVER"
-                    print("Starting Controller for HOVER")
+##                    print "SwitchCase HOVER"
+##                    print("Starting Controller for HOVER")
                     print ("Creating a StampedPose to be used as a constant ref signal for the controller")
                     self.flightStatus.setTargetPose(self.flightStatus.getCurrentPose().position)                
                     break
-    ##                Service_in.path.poses.append(self.flightStatus.getCurrentPoseStamped()) 
+##                Service_in.path.poses.append(self.flightStatus.getCurrentPoseStamped()) 
                     
                 if case('LAND'):
-                    print "SwitchCase LAND"
+##                    print "SwitchCase LAND"
                     self.flightStatus.setTargetPose(self.flightStatus.getCurrentPose().position)                
                     self.flightStatus._targetPose.position.z = self.flightStatus.getGroundLevel()
                     print 'Generating trajectory for LAND'
                     break
 
                 if case('TAKEOFF'):
-                    print "SwitchCase TAKEOFF"
+##                    print "SwitchCase TAKEOFF"
                     self.flightStatus.setTargetPose(self.flightStatus.getCurrentPose().position)                
                     self.flightStatus._targetPose.position.z = self.flightStatus.getSafeAltitude() + 0.1 #MOdify the z value of the private targetPose attribute
                     print 'Generating trajectory for TAKEOFF'
                     break
                 
                 if case('GO_HOME'):
-                    print "SwitchCase GOHOME"
+##                    print "SwitchCase GOHOME"
                     self.flightStatus.setTargetPose(self.flightStatus.getHomePose().position)                
-                    print 'GO_HOME'
+##                    print 'GO_HOME'
                     break
-                
-##        if self.str_ParentStateName is 'IDLE' or self.str_ParentStateName is 'HOVER': #Either HOVER or IDLE
-##            if self.str_ParentStateName is 'IDLE':
-##                                            #<<<---Initializing Controller in IDLE sub state machine--->>>
-##                #Come in from either LAND or AUTONOMOUS_INIT
-##                if self.flightStatus.listener.AutoPilotSwitch == False or self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK():
-##                    print ('All Controllers should be turned off...') 
-##                    # Designated that the controller should turn OFF
-##                    Service_in.running = False
-##                    print ('All Controllers turned off - we are DONE') 
-##                    #print ("AutoPilot if OFF or MissionGo is OFF  --->>> goto MANUAL") 
-##                else:
-##                    print("Getting ready to start mission...")
-##                    print ("Creating a StampedPose to be used as a constant ref signal for the controller")
-##                    Service_in.path.poses.append(self.flightStatus.getCurrentPoseStamped()) 
-##                                             #<<<---Initializing Controller in HOVER sub state machine--->>>
-##            elif self.str_ParentStateName is 'HOVER':
-##                print("Starting Controller for HOVER")
-##                print ("Creating a StampedPose to be used as a constant ref signal for the controller")
-##                Service_in.path.poses.append(self.flightStatus.getCurrentPoseStamped()) 
-##        else:                                #<<<---Initializing Controller in For TAKEOFF/LAND/GO_HOME sub state machine--->>>
-##            #Determine target altitude depending on parent state:
-##            if self.str_ParentStateName is 'TAKEOFF':
-##                z_final = self.flightStatus.getSafeAltitude() + 0.1
-##                print 'Generating trajectory for TAKEOFF'
-##            elif self.str_ParentStateName is 'LAND':
-##                z_final = self.flightStatus.getGroundLevel()
-##                print 'Generating trajectory for LAND'
-            
-        print "Prior to generating a trajectory"
-        print "Current:" , self.flightStatus.getCurrentPose()
-        print "Target:", self.flightStatus.getTargetPose()
+        
+##        print "Prior to generating a trajectory"
+##        print "Current:" , self.flightStatus.getCurrentPose()
+##        print "Target:", self.flightStatus.getTargetPose()
         # Call a function that generates a trajectory for the controller to follow - - >>>> SHOULD BE A SERVICE PROVIDOR            
         Service_in.path.poses = getTrajectory(self.flightStatus.getCurrentPose(),
                                               self.flightStatus.getTargetPose(),
                                               self.flightStatus.tolerance)
-                                                                
-            # Call a function that generates a trajectory for the controller to follow - - >>>> SHOULD BE A SERVICE PROVIDOR
-            #Service_in.path.poses = getTrajectoryAltitudeProfile(self.flightStatus.getCurrentPoseStamped(),
-            #                                                    self.flightStatus.getTargetPose(),
-            #                                                    self.flightStatus.tolerance)
+        
+        #Service_in.path.poses = getTrajectoryAltitudeProfile(self.flightStatus.getCurrentPoseStamped(),
+        #                                                     self.flightStatus.getTargetPose(),
+        #                                                     self.flightStatus.tolerance)
         
         # Send service request
         if self.controlManagement.ControllerClient(Service_in):

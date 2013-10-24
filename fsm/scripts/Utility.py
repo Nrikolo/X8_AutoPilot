@@ -8,6 +8,9 @@ import math
 from geometry_msgs.msg import Pose, Point, Quaternion, PoseStamped
 
 class switch(object):
+    """
+    python switch statement adapted from : http://code.activestate.com/recipes/410692-readable-switch-construction-without-lambdas-or-di/
+    """
     def __init__(self, value):
         self.value = value
         self.fall = False
@@ -21,34 +24,12 @@ class switch(object):
         """Indicate whether or not to enter a case suite"""
         if self.fall or not args:
             return True
-        elif self.value in args: # changed for v1.5, see below
+        elif self.value in args: 
             self.fall = True
             return True
         else:
             return False
 
-
-### The following example is pretty much the exact use-case of a dictionary,
-### but is included for its simplicity. Note that you can include statements
-### in each suite.
-##v = 'ten'
-##for case in switch(v):
-##    if case('one'):
-##        print 1
-##        break
-##    if case('two'):
-##        print 2
-##        break
-##    if case('ten'):
-##        print 10
-##        break
-##    if case('eleven'):
-##        print 11
-##        break
-##    if case(): # default, could also just omit condition or 'if True'
-##        print "something else!"
-##        # No need to break here, it'll stop anyway
-##        
 def PoseMsg2NumpyArray(pose_msg):
     """
     :param: pose_msg: A ros/geometry_msgs/Pose type msg
@@ -181,9 +162,7 @@ def getTrajectoryAltitudeProfile(currentPoseStamped, TargetPose, tolerance):
         if abs(z-z_final) < tolerance:
             #print ("trajectory length is {}".format(i))            
             break
-##        elif i>10*frequency:
-##            print ("Trajectory is more than 10 seconds long, truncated now! ")
-##            break
+
     print ("\nTrajectory start is: {}".format(trajectory[0].pose.position))
     print ("\nTrajectory end is: {}".format(trajectory[-1].pose.position))
     return trajectory
@@ -254,11 +233,9 @@ def getTrajectory(currentPose, TargetPose, tolerance):
         bool = numpy.array([abs(x-x_final),abs(y-y_final),abs(z-z_final)])<tolerance
         #print bool
         if bool.all():
-            print ("Trajectory length is {}".format(i))            
+##            print ("Trajectory length is {}".format(i))            
             break
-##        elif i>10*frequency:
-##            print ("Trajectory is more than 10 seconds long, truncated now! ")
-##            break
-    print ("\nTrajectory start is: {}".format(trajectory[0].pose.position))
-    print ("\nTrajectory end is: {}".format(trajectory[-1].pose.position))
+    print "\nTrajectory generated."    
+    print ("\nTrajectory start is:\n {}".format(trajectory[0].pose.position))
+    print ("\nTrajectory end is:\n {}".format(trajectory[-1].pose.position))
     return trajectory

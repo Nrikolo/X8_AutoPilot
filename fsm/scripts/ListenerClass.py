@@ -100,14 +100,3 @@ class ListenerClass():
         self.runningStatError_d[self.dictionary['y']].push(data.derivative.y)
         self.runningStatError_d[self.dictionary['z']].push(data.derivative.z)
     
-    
-    
-"""
-Massages that the FSM publishes to indicate the introspection server of it's status
-    /FSM/smach/container_status
-    /FSM/smach/container_structure
-If we subscribe to /FSM/smach/container_status and assign is to msg_in.path is a string
-Use find  !
-
-
-"""

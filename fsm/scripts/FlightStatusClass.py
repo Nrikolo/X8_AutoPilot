@@ -4,7 +4,6 @@
 #Implements the methods needed to determine flight status such as battery condition, state convergence, distance from home location
 #Most function return a boolean indicator partaining to the query requested. 
 
-
 PKG = 'fsm' # this package name
 import roslib; roslib.load_manifest(PKG)
 import rospy
@@ -25,20 +24,22 @@ from ListenerClass import ListenerClass
 
 
 class FlightStatusClass():
+    """
+    Implements the methods needed to determine flight status such as battery condition, state convergence, distance from home location
+    """
     def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
         print("Initializing Flight Status Object!")
-        # For Dox on the following see calling function, Main_AutoPilot.py
-        self.listener                = ListenerClass(queue_size,dictionary)
-        self._minimalBatteryVoltage  = MinBattVol
-        self._groundLevel            = groundlev
-        self._safeAltitude           = safeAltitude
-        self._throttleThreshold      = throttleThreshold
-        self._missionStartTime       = rospy.Time.now().to_sec()
-        self._missionMaxTime         = MaxTime        
-        self.tolerance               = tolerance 
-        self.sleepTime               = FSM_refreshRate 
-        self.setTargetPose() 
-        self.setHomePose(home.position, home.orientation)
+        self.listener                = ListenerClass(queue_size,dictionary) #An instance of class listener used as a subscriber and data logger
+        self._minimalBatteryVoltage  = MinBattVol                           #Minimal battery voltage allowed for flights
+        self._groundLevel            = groundlev                            #Ground altitude in /world frame of reference
+        self._safeAltitude           = safeAltitude                         #Safe operational altitude in /world frame of reference
+        self._throttleThreshold      = throttleThreshold                    #Throttle stick (TX) threshold above which FSM would consider pilot permission for takeoff
+        self._missionStartTime       = rospy.Time.now().to_sec()            #Mission State Time (in ROS)
+        self._missionMaxTime         = MaxTime                              #Alloted time for mission
+        self.tolerance               = tolerance                            #Distance tolerance [meters] used for convergence and arrival indication
+        self.sleepTime               = FSM_refreshRate                      #For debugging - A time delay when entering each state, set to 0.0 when operational
+        self.setTargetPose()                                                #Sets default target pose
+        self.setHomePose(home.position, home.orientation)                   #Sets initial home pose
             
     def getMinimalBatteryVoltage(self):
         """
@@ -168,6 +169,8 @@ class FlightStatusClass():
         
         Accesor Function to set the current target pose of the vehicle (to where the controller is aiming to drive)
         """
+        #Ensure the target pose altitude is above safeAltitude
+        position.z = position.z if position.z > self.getSafeAltitude() else self.getSafeAltitude()
         self._targetPose = Pose(position,orientation)
         return 
     
@@ -206,11 +209,11 @@ class FlightStatusClass():
         
     def IsHome(self):
         """
-        :return: A boolean indicating whether vehicle is within a predefined threshold of the distance home
+        :return: A boolean indicating whether vehicle is within a predefined threshold of the distance home (2D - planar)
         
         Function indicates if vehicle is in home coordinates
         """
-        return self.DistanceToHome()<self.tolerance
+        return self.DistanceToHome(2)<self.tolerance
     
     def ErrorConverge(self,str_attribute):
         """
@@ -249,10 +252,7 @@ class FlightStatusClass():
         
         :return: A boolean indicating whether position error has converged and velocity is ~zero (vehicle is hovering)
         """
-        distance_to_target = Distance('Euclidean',
-                                      PoseMsg2NumpyArrayPosition( self.getCurrentPose() ),
-                                      PoseMsg2NumpyArrayPosition( self.getTargetPose()  ),
-                                      3)
+        distance_to_target = self.DistanceToTarget(3)
         print "\nDistance to TARGET: " , distance_to_target
         
         bool    = abs(distance_to_target)< self.tolerance #Close to target
@@ -293,7 +293,7 @@ class FlightStatusClass():
             bool *= not self.ErrorDiverge(str)
         return bool
 
-    def DistanceToHome(self):
+    def DistanceToHome(self,dim):
         """
         :return: A float representing the 2D (x-y planar) Euclidean distance of the vehicle from home
     
@@ -301,9 +301,21 @@ class FlightStatusClass():
         dist = Distance('Euclidean',
                         PoseMsg2NumpyArrayPosition(self.getCurrentPose() ),
                         PoseMsg2NumpyArrayPosition(self.getHomePose()    ),
-                        2)
+                        dim)
         return dist
 
+
+    def DistanceToTarget(self,dim):
+        """
+        :return: A float representing the 2D (x-y planar) Euclidean distance of the vehicle from target pose
+    
+        """        
+        dist = Distance('Euclidean',
+                        PoseMsg2NumpyArrayPosition(self.getCurrentPose() ),
+                        PoseMsg2NumpyArrayPosition(self.getTargetPose()    ),
+                        dim)
+        return dist
+    
     
     def VoltageNeededToGetHome(self):
         """
@@ -314,8 +326,8 @@ class FlightStatusClass():
         """        
         #Presently implements an arbitrary scaling from distance to voltage 
 ##        CurrentStampedPose = self.getCurrentPoseStamped()
-        dist = self.DistanceToHome()       
-        #print("Vehicle is a distance of %s meters away from home " % dist)
+        dist = self.DistanceToHome(2)       
+        print("Vehicle is a distance of %s meters away from home " %dist)
         return dist*0.001 #<<<--- !!!
         
         
