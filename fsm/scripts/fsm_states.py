@@ -276,6 +276,7 @@ class CONTROLLER_INIT(smach.State):
 ##                    print "SwitchCase GOHOME"
                     self.flightStatus.setTargetPose(self.flightStatus.getHomePose().position)                
 ##                    print 'GO_HOME'
+##                    print 'GO_HOME'
                     break
         
 ##        print "Prior to generating a trajectory"
