@@ -263,6 +263,7 @@ class FlightStatusClass():
         else:
             for str in 'xyz':
                 bool *= self.ErrorConverge(str)
+                if not bool: return bool
             return bool
 
     def ErrorDiverge(self,str_attribute):
@@ -297,7 +298,7 @@ class FlightStatusClass():
 
     def DistanceToHome(self,dim):
         """
-        :return: A float representing the 2D (x-y planar) Euclidean distance of the vehicle from home
+        :return: A float representing the dim-D Euclidean distance of the vehicle from home
     
         """        
         dist = Distance('Euclidean',
@@ -309,7 +310,7 @@ class FlightStatusClass():
 
     def DistanceToTarget(self,dim):
         """
-        :return: A float representing the 2D (x-y planar) Euclidean distance of the vehicle from target pose
+        :return: A float representing the dim-D Euclidean distance of the vehicle from target pose
     
         """        
         dist = Distance('Euclidean',
@@ -329,7 +330,7 @@ class FlightStatusClass():
         #Presently implements an arbitrary scaling from distance to voltage 
 ##        CurrentStampedPose = self.getCurrentPoseStamped()
         dist = self.DistanceToHome(2)       
-        print("Vehicle is a distance of %s meters away from home " %dist)
+##        print("Vehicle is a distance of %s meters away from home " %dist)
         return dist*0.001 #<<<--- !!!
         
         

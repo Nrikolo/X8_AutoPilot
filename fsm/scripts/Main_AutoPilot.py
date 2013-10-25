@@ -37,8 +37,8 @@ def main():
     #Define Static Parameters 
     homePose             = Pose(Point(0.0, 0.0, safeAltitude),
                                 Quaternion(0.0,0.0,0.0,1.0)) #Default Home [x,y,z] position, msg type  of geometry_msgs 
-    tolerance            = 0.1                 #[meters] proximity measure for controller convergence and target reaching
-    queue_size           = 100                  #Size of history queue of pose msgs saved for convergence computation
+    tolerance            = 0.10                 #[meters] proximity measure for controller convergence and target reaching
+    queue_size           = 50                  #Size of history queue of pose msgs saved for convergence computation
     dictionary           = {'x' : 0,            #Dictionary to map PoseQueue rows to axes
                             'y' : 1,
                             'z' : 2,
@@ -48,7 +48,7 @@ def main():
                             'q0': 6}
     
     #Define Debugging Aid
-    fsm_refresh_rate     = 1.0 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
+    fsm_refresh_rate     = 0.0 #A time interval in seconds [float] to wait when entering each state - used as rospy.sleep(fsm_refresh_rate)
     print "\n------------------------------------------------------------------------------------------------------------------\n"
             
     #Contruct a FlightStatusIndicator as a member of sm_top
@@ -161,7 +161,7 @@ def main():
                                                 'Failure':'Failure'})
 #----------------------------------------------------------------------------------------
     # Create the HOVER SMACH state machine
-            sm_hover = smach.StateMachine(outcomes=['ToLand','ToManual','ToHome']) 
+            sm_hover = smach.StateMachine(outcomes=['ToLand','ToManual','ToHome','FollowTraj']) 
 ##                                        input_keys=['HoverSM_mission_stage_in'],
 ##                                        output_keys=['HoverSM_mission_stage_out'])      
             with sm_hover:
@@ -176,7 +176,8 @@ def main():
                                         transitions={'Maintain':'HOVER_MONITOR',
                                                     'Aborted_NoBatt':'ToLand',
                                                     'Aborted_Diverge':'ToManual',
-                                                    'GoHome':'ToHome'})
+                                                    'GoHome':'ToHome',
+                                                    'FollowTraj':'FollowTraj'})
 ##                                        remapping = {'Hover_mission_stage_in':'HoverSM_mission_stage_in',
 ##                                                    'Hover_mission_stage_out':'HoverSM_mission_stage_out'})
             #Add a HOVER sub state machine to the autonomous manifold                                                            
@@ -184,7 +185,8 @@ def main():
                                     sm_hover, 
                                     transitions={'ToLand':'LAND',
                                                  'ToHome':'GO_HOME',
-                                                'ToManual':'Failure'})
+                                                'ToManual':'Failure',
+                                                'FollowTraj':'FOLLOW_TRAJ'})
 ##                                    remapping = {'HoverSM_mission_stage_in':'Autonomous_mission_stage_in',
 ##                                                'HoverSM_mission_stage_out':'Autonomous_mission_stage_out'})
 #----------------------------------------------------------------------------------------                                   
@@ -213,6 +215,33 @@ def main():
                                                 'ToManual':'Failure'})
 ##                                    remapping = {'GoHomeSM_mission_stage_in':'Autonomous_mission_stage_in',
 ##                                                'GoHomeSM_mission_stage_out':'Autonomous_mission_stage_out'})
+#----------------------------------------------------------------------------------------                                   
+    # Create the FOLLOW_TRAJ state machine
+            sm_followTraj = smach.StateMachine(outcomes=['ToHover','ToManual'])
+##                                            input_keys=['GoHomeSM_mission_stage_in'],
+##                                            output_keys=['GoHomeSM_mission_stage_out'])      
+            with sm_followTraj:
+                # Create and add the GO_HOME_INIT SMACH state into the GO_HOME sub state machine
+                smach.StateMachine.add('FOLLOW_TRAJ_INIT',
+                                        CONTROLLER_INIT(sm_top.FlightStatus,sm_top.ControlManager,'FOLLOW_TRAJ'),
+                                        transitions={'Success':'FOLLOW_TRAJ_MONITOR',
+                                                    'Failure':'ToManual'})
+                # Create and add the HOVER_MONITOR SMACH state into the HOVER sub state machine
+                smach.StateMachine.add('FOLLOW_TRAJ_MONITOR',
+                                        FOLLOW_TRAJECTORY(sm_top.FlightStatus,'FOLLOW_TRAJ'),
+                                        transitions={'Arrived':'ToHover',                                                   
+                                                    'Maintain':'FOLLOW_TRAJ_MONITOR',
+                                                    'Aborted_Diverge':'ToManual'})
+##                                         remapping = {'TrajFol_mission_stage_in':'GoHomeSM_mission_stage_in',
+##                                                      'TrajFol_mission_stage_out':'GoHomeSM_mission_stage_out'})
+            #Add a HOVER sub state machine to the autonomous manifold                                                            
+            smach.StateMachine.add('FOLLOW_TRAJ',
+                                    sm_followTraj,
+                                    transitions={'ToHover':'HOVER',
+                                                'ToManual':'Failure'})
+##                                    remapping = {'GoHomeSM_mission_stage_in':'Autonomous_mission_stage_in',
+##                                                'GoHomeSM_mission_stage_out':'Autonomous_mission_stage_out'})
+
 #----------------------------------------------------------------------------------------                                   
         #Add the Autonomous (manifold) state to the top container state machine
         smach.StateMachine.add('AUTONOMOUS', 

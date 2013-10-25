@@ -183,7 +183,7 @@ def getTrajectory(currentPose, TargetPose , tolerance = 0.01):
                                    PoseMsg2NumpyArrayPosition( currentPose ),
                                    PoseMsg2NumpyArrayPosition( TargetPose ),
                                    3)    
-    print "Euclidean Distance to Target: " , distance_to_target 
+##    print "Euclidean Distance to Target: " , distance_to_target 
     if distance_to_target < tolerance :
         print "Basically at target already"
         StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
@@ -235,7 +235,7 @@ def getTrajectory(currentPose, TargetPose , tolerance = 0.01):
         if bool.all():
 ##            print ("Trajectory length is {}".format(i))            
             break
-    print "\nTrajectory generated."    
+##    print "\nTrajectory generated."    
     print ("\nTrajectory start is:\n {}".format(trajectory[0].pose.position))
     print ("\nTrajectory end is:\n {}".format(trajectory[-1].pose.position))
     return trajectory
