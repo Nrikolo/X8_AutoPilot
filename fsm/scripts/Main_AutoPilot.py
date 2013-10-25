@@ -28,17 +28,18 @@ def main():
     sm_top                                = smach.StateMachine(outcomes=['Done'])
    
     #Safety Parameters (there is no const in python, caferful when accesing these from within the sub_fsms)
-    safeAltitude        = 2.0
+    safeAltitude        = 4.0
     BattMinimalVoltage  = 13.8
     groundLevel         = 0.308
     throttleThreshold   = 0.2
+    stable              = True
     missionMaxTime      = rospy.Duration(60).to_sec() #300 sec = 5 min
 
     #Define Static Parameters 
     homePose             = Pose(Point(0.0, 0.0, safeAltitude),
                                 Quaternion(0.0,0.0,0.0,1.0)) #Default Home [x,y,z] position, msg type  of geometry_msgs 
-    tolerance            = 0.10                 #[meters] proximity measure for controller convergence and target reaching
-    queue_size           = 50                  #Size of history queue of pose msgs saved for convergence computation
+    tolerance            = 0.15                 #[meters] proximity measure for controller convergence and target reaching
+    queue_size           = 100                  #Size of history queue of pose msgs saved for convergence computation
     dictionary           = {'x' : 0,            #Dictionary to map PoseQueue rows to axes
                             'y' : 1,
                             'z' : 2,
@@ -61,16 +62,17 @@ def main():
                                             missionMaxTime,
                                             homePose,
                                             fsm_refresh_rate,
-                                            tolerance)
+                                            tolerance,
+                                            stable)
     #Contruct a ControlManager as a member of sm_top
     sm_top.ControlManager = ControllerManagementClass()
+    
     # Open the container
     with sm_top:
         # Add states to the container
         smach.StateMachine.add('MANUAL',
                                 MANUAL(sm_top.FlightStatus), 
                                 transitions={'TOAUTONOMOUS':'AUTONOMOUS','Monitor':'MANUAL', 'Finish':'Done'})
-##                                remapping = {'manual_mission_stage_in':'start_mission_stage'})        
 #----------------------------------------------------------------------------------------
         # Create an Autonomous (manifold) FSM within the top container
         sm_autonomous = smach.StateMachine(outcomes=['Success','Failure'])

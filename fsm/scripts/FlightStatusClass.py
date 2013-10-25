@@ -28,7 +28,7 @@ class FlightStatusClass():
     """
     Implements the methods needed to determine flight status such as battery condition, state convergence, distance from home location
     """
-    def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance):
+    def __init__(self,dictionary,queue_size,MinBattVol,safeAltitude,groundlev, throttleThreshold, MaxTime,home,FSM_refreshRate,tolerance,stable):
         print("Initializing Flight Status Object!")
         self.listener                = ListenerClass(queue_size,dictionary) #An instance of class listener used as a subscriber and data logger
         self._minimalBatteryVoltage  = MinBattVol                           #Minimal battery voltage allowed for flights
@@ -37,11 +37,28 @@ class FlightStatusClass():
         self._throttleThreshold      = throttleThreshold                    #Throttle stick (TX) threshold above which FSM would consider pilot permission for takeoff
         self._missionStartTime       = rospy.Time.now().to_sec()            #Mission State Time (in ROS)
         self._missionMaxTime         = MaxTime                              #Alloted time for mission
+        self._stable                 = stable                               #stable vehicle?
         self.tolerance               = tolerance                            #Distance tolerance [meters] used for convergence and arrival indication
         self.sleepTime               = FSM_refreshRate                      #For debugging - A time delay when entering each state, set to 0.0 when operational
         self.setTargetPose()                                                #Sets default target pose
         self.setHomePose(home.position, home.orientation)                   #Sets initial home pose
             
+    def changeStable(self):
+        """
+        :return: void
+        
+        Accesor function 
+        """
+        self._stable = not self._stable
+        
+    def getStable(self):
+        """
+        :return: boolean
+        
+        Accesor function 
+        """
+        return self._stable 
+    
     def getMinimalBatteryVoltage(self):
         """
         :return: Minimal Allowed Battery Voltage
@@ -274,11 +291,21 @@ class FlightStatusClass():
         Utility function to determine if error of controller is divering / unstable
         """        
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
+        e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
+        
+        print "\n------------------------------------------------------------------------------------------------------------------\n"
+        print "\nError Mean" , str_attribute, e_mean
+        print "Error Var" , str_attribute, e_var       
+     
+        print "\nError Derivative Mean of " , str_attribute , e_d_mean
+        print "Error Derivative Var" , str_attribute , e_d_var
+                
         #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
         #print "e_d_mean", e_d_mean
-        bool_error_d = abs(e_d_mean)  > 10*self.tolerance       
-        if bool_error_d :
-            print "Error derivative in " ,str_attribute ,"Diverged"            
+##        bool_error   = abs(e_var)  > 100*math.pow(self.tolerance,2)           
+        bool_error_d = abs(e_d_mean)  > 100*self.tolerance       
+        if bool_error_d     :
+            print "Error derivative mean or variance of position in " ,str_attribute ,"Diverged"            
             return True
             
         else :
@@ -291,10 +318,13 @@ class FlightStatusClass():
         
         Utility function to determine if any errors / states are divering / unstable
         """                
-        bool = False 
+        bool = True 
         for str in 'xyz':
             bool *= not self.ErrorDiverge(str)
-        return bool
+            if not bool:
+                self.changeStable() 
+                return not bool
+        return not bool
 
     def DistanceToHome(self,dim):
         """

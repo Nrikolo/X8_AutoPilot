@@ -21,7 +21,6 @@ class ControllerManagementClass():
         
         self.handle_service = rospy.ServiceProxy('controller/command', CommandController)        
         
-    #def ControllerClient(self, ON_OFF, trajectory, input_gain_flag, gains):
     def ControllerClient(self, service_in):
         try:
             resp = self.handle_service(service_in.running, service_in.path, service_in.gains)

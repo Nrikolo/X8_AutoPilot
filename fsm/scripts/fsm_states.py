@@ -25,14 +25,13 @@ class MANUAL(smach.State):
         smach.State.__init__(self, outcomes=['Finish',
                                             'Monitor',
                                             'TOAUTONOMOUS'])
-##                                   input_keys=['manual_mission_stage_in'])
         self.flightStatus = flightStatus
 
      def execute(self, userdata):
 ##        rospy.loginfo('Executing state MANUAL')
         rospy.sleep(self.flightStatus.sleepTime)
-        #rospy.loginfo(" I heard  %s  ",  self.flightStatus.homeCoordinates)
-        if ( self.flightStatus.IsBatteryOK() ) and ( self.flightStatus.listener.AutoPilotSwitch == True  ) :
+##        print "\nstable:",   self.flightStatus.getStable() 
+        if ( self.flightStatus.IsBatteryOK() ) and ( self.flightStatus.listener.AutoPilotSwitch == True  ) and self.flightStatus.getStable() == True  :
             print ("AutoPilot switch is ON, there is enough battery ---->>> Transfering control to PC ")                 
             return 'TOAUTONOMOUS'
              
@@ -40,6 +39,7 @@ class MANUAL(smach.State):
             print ("Mission Duration Exceeded - Finish") 
             return 'Finish'
         else:
+                
             return 'Monitor'
 
 class AUTONOMOUS_INIT(smach.State):
@@ -123,8 +123,8 @@ class HOVER(smach.State):
                 return 'Aborted_NoBatt' #->Vehicle should LAND
             else: 
                 return 'GoHome' #->Vehicle should return home
-        print "self.flightStatus.DistanceToTarget(3)", self.flightStatus.DistanceToTarget(3)        
-        if self.flightStatus.DistanceToTarget(3) > 10 * self.flightStatus.tolerance:
+        #print "self.flightStatus.DistanceToTarget(3)", self.flightStatus.DistanceToTarget(3)        
+        if self.flightStatus.DistanceToTarget(3) > 15 * self.flightStatus.tolerance:
             print("Far away from target, should generate a trajectry to go there")
             return 'FollowTraj'
         print("Hovering....")
@@ -199,17 +199,21 @@ class FOLLOW_TRAJECTORY(smach.State):
         if self.flightStatus.PositionErrorConverge() : #Regardless of parent container, if arrived at destination, should goto HOVER
             print ("Seems like vehicle arrived at destination --->>> goto HOVER") 
             return 'Arrived'
-
-        if self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK() or self.flightStatus.IsTimeExceeded() :                 
-            print ("Either pilot wants vehicle to return on, or no battery or no time left for mission...")
-            if self.str_ParentStateName is 'GO_HOME' :    
+        
+        for case in switch(self.str_ParentStateName):
+            if case('GO_HOME'):
+                if self.flightStatus.IsBatteryOK() and not self.flightStatus.IsTimeExceeded() and self.flightStatus.listener.MissionGoSwitch == True :
+                    return 'Arrived' #->Vehicle should go to HOVER
+                else:
                     print ("Vehicle returning home...")
                     return 'Maintain' #->Vehicle should continue going home
-            else: 
-                    print ("Vehicle following some trajectory, but should be returning home...first goto -->>HOVER")
+                break
+            if case('FOLLOW_TRAJ'):
+                if self.flightStatus.listener.MissionGoSwitch == False or not self.flightStatus.IsBatteryOK() or self.flightStatus.IsTimeExceeded() :
                     return 'Arrived' #->Vehicle should go to HOVER
-        
-        print("Following Trajectory")
+                break
+
+        print("Following Trajectory...")
         return 'Maintain'
             
 
@@ -284,14 +288,8 @@ class CONTROLLER_INIT(smach.State):
 ##        print "Target:", self.flightStatus.getTargetPose()
         # Call a function that generates a trajectory for the controller to follow - - >>>> SHOULD BE A SERVICE PROVIDOR            
         Service_in.path.poses = getTrajectory(self.flightStatus.getCurrentPose(),
-                                              self.flightStatus.getTargetPose(),
-                                              self.flightStatus.tolerance)
+                                              self.flightStatus.getTargetPose())
         
-        #Service_in.path.poses = getTrajectoryAltitudeProfile(self.flightStatus.getCurrentPoseStamped(),
-        #                                                     self.flightStatus.getTargetPose(),
-        #                                                     self.flightStatus.tolerance)
-        
-        # Send service request
         if self.controlManagement.ControllerClient(Service_in):
             print("Controller SUCCEEDED to turn " + self.dict[str(Service_in.running)] )
             return 'Success'
