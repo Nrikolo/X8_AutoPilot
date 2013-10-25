@@ -8,6 +8,7 @@ import random
 #Importing SMACH package 
 import smach
 import smach_ros
+from smach_ros import ServiceState
 #For dealing with msgs
 from std_msgs.msg import String, Float64, Bool
 from geometry_msgs.msg import Pose, Point, Quaternion
@@ -78,6 +79,14 @@ def main():
 ##                                           output_keys = ['Autonomous_mission_stage_out'])
         # Open the autonomous container
         with sm_autonomous:
+#----------------------------------------------------------------------------------------                                   
+        # Create the PLAN_TRAJ service state
+            smach.StateMachine.add('PLAN_TRAJ',
+                                    ServiceState('MotionPlanner',
+                                                 ServiceType,
+                                                 request = ServiceType(ConstInput) ),
+                                    transitions={'succeeded':'succeeded'})
+
 
         # Create and add the AutonomousInit SMACH state 
             smach.StateMachine.add('AUTONOMOUS_INIT',
@@ -221,12 +230,12 @@ def main():
 ##                                            input_keys=['GoHomeSM_mission_stage_in'],
 ##                                            output_keys=['GoHomeSM_mission_stage_out'])      
             with sm_followTraj:
-                # Create and add the GO_HOME_INIT SMACH state into the GO_HOME sub state machine
+                # Create and add the FOLLOW_TRAJ_INIT SMACH state into the FOLLOW_TRAJ sub state machine
                 smach.StateMachine.add('FOLLOW_TRAJ_INIT',
                                         CONTROLLER_INIT(sm_top.FlightStatus,sm_top.ControlManager,'FOLLOW_TRAJ'),
                                         transitions={'Success':'FOLLOW_TRAJ_MONITOR',
                                                     'Failure':'ToManual'})
-                # Create and add the HOVER_MONITOR SMACH state into the HOVER sub state machine
+                # Create and add the FOLLOW_TRAJ_MONITOR SMACH state into the FOLLOW_TRAJ sub state machine
                 smach.StateMachine.add('FOLLOW_TRAJ_MONITOR',
                                         FOLLOW_TRAJECTORY(sm_top.FlightStatus,'FOLLOW_TRAJ'),
                                         transitions={'Arrived':'ToHover',                                                   
@@ -234,7 +243,7 @@ def main():
                                                     'Aborted_Diverge':'ToManual'})
 ##                                         remapping = {'TrajFol_mission_stage_in':'GoHomeSM_mission_stage_in',
 ##                                                      'TrajFol_mission_stage_out':'GoHomeSM_mission_stage_out'})
-            #Add a HOVER sub state machine to the autonomous manifold                                                            
+            #Add a FOLLOW_TRAJ sub state machine to the autonomous manifold                                                            
             smach.StateMachine.add('FOLLOW_TRAJ',
                                     sm_followTraj,
                                     transitions={'ToHover':'HOVER',
