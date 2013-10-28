@@ -38,7 +38,7 @@ def main():
     #Define Static Parameters 
     homePose             = Pose(Point(0.0, 0.0, safeAltitude),
                                 Quaternion(0.0,0.0,0.0,1.0)) #Default Home [x,y,z] position, msg type  of geometry_msgs 
-    tolerance            = 0.15                 #[meters] proximity measure for controller convergence and target reaching
+    tolerance            = 0.2                #[meters] proximity measure for controller convergence and target reaching
     queue_size           = 100                  #Size of history queue of pose msgs saved for convergence computation
     dictionary           = {'x' : 0,            #Dictionary to map PoseQueue rows to axes
                             'y' : 1,

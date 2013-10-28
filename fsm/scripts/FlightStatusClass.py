@@ -250,11 +250,11 @@ class FlightStatusClass():
         #Controller Errors
         e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
-        print "\nError Mean", e_mean
-        print "Error Var", e_var       
-     
-        print "\nError Derivative Mean", e_d_mean
-        print "Error Derivative Var" , e_d_var
+##        print "\nError Mean", e_mean
+##        print "Error Var", e_var       
+##     
+##        print "\nError Derivative Mean", e_d_mean
+##        print "Error Derivative Var" , e_d_var
 
         bool_error   =  abs(e_mean) < self.tolerance and e_var< math.pow(self.tolerance,2)
         bool_error_d =  abs(e_d_mean)  < self.tolerance and e_d_var< math.pow(self.tolerance,2)
@@ -272,7 +272,7 @@ class FlightStatusClass():
         :return: A boolean indicating whether position error has converged and velocity is ~zero (vehicle is hovering)
         """
         distance_to_target = self.DistanceToTarget(3)
-        print "\nDistance to TARGET: " , distance_to_target
+##        print "\nDistance to TARGET: " , distance_to_target
         
         bool    = abs(distance_to_target)< self.tolerance #Close to target
         if not bool:
@@ -293,17 +293,17 @@ class FlightStatusClass():
         e_d_mean, e_d_var = self.listener.runningStatError_d[self.listener.dictionary[str_attribute]].Mean_Variance()
         e_mean, e_var = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean_Variance()
         
-        print "\n------------------------------------------------------------------------------------------------------------------\n"
-        print "\nError Mean" , str_attribute, e_mean
-        print "Error Var" , str_attribute, e_var       
-     
-        print "\nError Derivative Mean of " , str_attribute , e_d_mean
-        print "Error Derivative Var" , str_attribute , e_d_var
+##        print "\n------------------------------------------------------------------------------------------------------------------\n"
+##        print "\nError Mean" , str_attribute, e_mean
+##        print "Error Var" , str_attribute, e_var       
+##     
+##        print "\nError Derivative Mean of " , str_attribute , e_d_mean
+##        print "Error Derivative Var" , str_attribute , e_d_var
                 
         #bool_error   = self.listener.runningStatError[self.listener.dictionary[str_attribute]].Mean()    < 1       
         #print "e_d_mean", e_d_mean
 ##        bool_error   = abs(e_var)  > 100*math.pow(self.tolerance,2)           
-        bool_error_d = abs(e_d_mean)  > 100*self.tolerance       
+        bool_error_d = abs(e_d_mean)  > 500*self.tolerance       
         if bool_error_d     :
             print "Error derivative mean or variance of position in " ,str_attribute ,"Diverged"            
             return True

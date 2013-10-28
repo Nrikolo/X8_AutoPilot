@@ -209,7 +209,7 @@ def getTrajectory(currentPose, TargetPose , tolerance = 0.01):
         v_max   = 1.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
         delay   = 0.0
     else:
-        v_max   = delta/5.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
+        v_max   = delta/2.0 #[meters\second] Should be a function of the time horizon and the change in altitude  i.e : v_max = abs(z_final-z_init)/horizon    
         delay   = math.log(delta/tolerance - 1)/v_max
         
     #Loop to populate trajectory with StampedPoses instances
@@ -219,7 +219,7 @@ def getTrajectory(currentPose, TargetPose , tolerance = 0.01):
         StampedPose                 = PoseStamped() #Construct a StampedPose MSG        
         StampedPose.header.frame_id = "/world" #Frame of ref that the trajectory is formualted in
         t                           = rospy.Duration(float(i)/frequency)        #create a time instance
-        den                         = (1+math.exp(-v_max*(t.to_sec()-delay)))  
+        den                         = math.pow((1+math.exp(-v_max*(t.to_sec()-delay))),1)  
         x                           = x_init + (x_final - x_init)/den    #compute its height
         y                           = y_init + (y_final - y_init)/den
         z                           = z_init + (z_final - z_init)/den
